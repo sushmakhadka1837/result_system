@@ -1,0 +1,10 @@
+# Composer dependencies
+/vendor/
+
+# Composer lock file
+composer.lock
+
+# OS / Editor specific files
+.DS_Store
+Thumbs.db
+*.log

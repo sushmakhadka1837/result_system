@@ -18,7 +18,6 @@ if (!$admin_id) {
 $admin_data = getAdminById($admin_id, $conn);
 $username   = $admin_data['email'] ?? 'Admin User';
 $last_login = $admin_data['last_login_at'] ?? 'N/A';
-
 $page_title = "Admin Dashboard";
 ?>
 <!DOCTYPE html>
@@ -28,7 +27,6 @@ $page_title = "Admin Dashboard";
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= htmlspecialchars($page_title); ?></title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="bg-gray-50 font-sans">
 
@@ -45,15 +43,15 @@ $page_title = "Admin Dashboard";
   <!-- Sidebar -->
   <aside class="w-64 bg-gray-900 text-gray-200">
     <nav class="p-4 space-y-2">
-      <a href="admin_dashboard.php" class="block px-3 py-2 rounded hover:bg-gray-700 <?= is_active_link('admin_dashboard.php'); ?>">Dashboard</a>
-      <a href="manage_users.php" class="block px-3 py-2 rounded hover:bg-gray-700 <?= is_active_link('manage_users.php'); ?>">Manage Users</a>
-      <a href="manage_departments.php" class="block px-3 py-2 rounded hover:bg-gray-700 <?= is_active_link('manage_departments.php'); ?>">Manage Departments</a>
-      <a href="manage_subjects.php" class="block px-3 py-2 rounded hover:bg-gray-700 <?= is_active_link('manage_subjects.php'); ?>">Manage Subjects</a>
-      <a href="manage_students.php" class="block px-3 py-2 rounded hover:bg-gray-700 <?= is_active_link('manage_students.php'); ?>">Manage Students</a>
-      <a href="manage_teachers.php" class="block px-3 py-2 rounded hover:bg-gray-700 <?= is_active_link('manage_teachers.php'); ?>">Manage Teachers</a>
-      <a href="publish_results.php" class="block px-3 py-2 rounded hover:bg-gray-700 <?= is_active_link('publish_results.php'); ?>">Publish Results</a>
-      <a href="admin_settings.php" class="block px-3 py-2 rounded hover:bg-gray-700 <?= is_active_link('admin_settings.php'); ?>">Settings</a>
-      <a href="activity_log.php" class="block px-3 py-2 rounded hover:bg-gray-700 <?= is_active_link('activity_log.php'); ?>">Activity Log</a>
+      <a href="admin_dashboard.php" class="block px-3 py-2 rounded hover:bg-gray-700">Dashboard</a>
+      <a href="manage_users.php" class="block px-3 py-2 rounded hover:bg-gray-700">Manage Users</a>
+      <a href="manage_departments.php" class="block px-3 py-2 rounded hover:bg-gray-700">Manage Departments</a>
+      <a href="manage_subjects.php" class="block px-3 py-2 rounded hover:bg-gray-700">Manage Subjects</a>
+      <a href="manage_students.php" class="block px-3 py-2 rounded hover:bg-gray-700">Manage Students</a>
+      <a href="manage_teachers.php" class="block px-3 py-2 rounded hover:bg-gray-700">Manage Teachers</a>
+      <a href="admin_publish_results.php" class="block px-3 py-2 rounded hover:bg-gray-700">Publish Results</a>
+      <a href="admin_settings.php" class="block px-3 py-2 rounded hover:bg-gray-700">Settings</a>
+      <a href="activity_log.php" class="block px-3 py-2 rounded hover:bg-gray-700">Activity Log</a>
     </nav>
   </aside>
 
@@ -61,7 +59,7 @@ $page_title = "Admin Dashboard";
   <main class="flex-1 p-6">
     <h2 class="text-2xl font-semibold mb-4">Dashboard Overview</h2>
     <p class="text-gray-600 mb-6">Central control panel for the Result Management System.</p>
-
+    
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
       <div class="bg-white rounded-lg p-5 shadow">
@@ -90,37 +88,17 @@ $page_title = "Admin Dashboard";
       </div>
     </div>
 
-    <!-- Charts -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div class="bg-white p-5 rounded-lg shadow">
-        <h3 class="mb-3 text-gray-600">Result Trend</h3>
-        <canvas id="resultTrend"></canvas>
-      </div>
-      <div class="bg-white p-5 rounded-lg shadow">
-        <h3 class="mb-3 text-gray-600">Pass vs Fail</h3>
-        <canvas id="passFail"></canvas>
-      </div>
-    </div>
+    <!-- =========================
+         Upload Notes Section
+    ========================= -->
+
+
   </main>
 </div>
 
 <footer class="bg-gray-200 text-center py-4 mt-6">
   <p>&copy; <?= date('Y'); ?> Your College Name. All rights reserved.</p>
 </footer>
-
-<script>
-new Chart(document.getElementById('resultTrend'), {
-    type: 'line',
-    data: {
-      labels: ['Jan','Feb','Mar','Apr','May','Jun'],
-      datasets: [{label: 'Average Marks', data: [60,65,70,68,75,80], borderColor:'rgb(79,70,229)', fill:false, tension:0.3}]
-    }
-});
-new Chart(document.getElementById('passFail'), {
-    type:'doughnut',
-    data:{labels:['Pass','Fail'], datasets:[{data:[80,20], backgroundColor:['rgb(34,197,94)','rgb(239,68,68)']}]}
-});
-</script>
 
 </body>
 </html>

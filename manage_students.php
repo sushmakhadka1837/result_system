@@ -1,153 +1,137 @@
 <?php
-require 'db_config.php'; // expects $conn (mysqli)
 
-$departments = [];
-$dept_stmt = $conn->prepare("SELECT id, department_name, total_semesters FROM departments ORDER BY department_name ASC");
-if ($dept_stmt) {
-    $dept_stmt->execute();
-    $dept_result = $dept_stmt->get_result();
-    while ($d = $dept_result->fetch_assoc()) {
-        $departments[] = $d;
-    }
-    $dept_stmt->close();
+$conn = new mysqli("localhost", "root", "", "result_system");
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
 }
 
-$students = [];
-$highlight_ids = [];
-$selected_dept = $_POST['department'] ?? '';
-$selected_sem  = $_POST['semester'] ?? '';
-$search_name   = trim($_POST['name'] ?? '');
-$total_semesters = 8; // default
 
-// department ko total_semesters निकाल्ने
-if ($selected_dept) {
-    foreach ($departments as $d) {
-        if ($d['id'] == $selected_dept) {
-            $total_semesters = $d['total_semesters'];
-            break;
-        }
-    }
-}
+$departments = $conn->query("SELECT * FROM departments");
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if ($selected_dept !== '' && $selected_sem !== '') {
-        // department अब students मा string छ (id होइन) → JOIN हटाइयो
-        $sql = "SELECT id, full_name, symbol_no, semester, batch_year, department, email, phone 
-                FROM students 
-                WHERE department = ? AND semester = ?
-                ORDER BY full_name ASC";
-        $stmt = $conn->prepare($sql);
-        if ($stmt) {
-            $stmt->bind_param("ss", $selected_dept, $selected_sem);
-            $stmt->execute();
-            $res = $stmt->get_result();
-            while ($row = $res->fetch_assoc()) {
-                $students[] = $row;
-                if ($search_name !== '' && stripos($row['full_name'], $search_name) !== false) {
-                    $highlight_ids[] = $row['id'];
-                }
-            }
-            $stmt->close();
-        }
+
+$selected_dept = '';
+$semesters_query = [];
+
+
+if(isset($_POST['department'])) {
+    $selected_dept = $_POST['department'];
+
+   
+    if($selected_dept == 'YOUR_ARCHITECTURE_DEPARTMENT_ID'){ 
+        $semester_limit = 10;
+    } else {
+        $semester_limit = 8;
     }
+
+    $semesters_query = $conn->query("SELECT * FROM semesters WHERE id <= $semester_limit");
+} else {
+    $semesters_query = $conn->query("SELECT * FROM semesters WHERE id <= 8");
 }
 ?>
-<!DOCTYPE html>
-<html lang="ne">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Manage Students</title>
-<style>
-    :root{
-        --excel-header: #dfefff;
-        --excel-highlight: #fff59d;
-        --zebra1: #ffffff;
-        --zebra2: #f7f9fc;
-        --border: #c7d0da;
-        --text: #222;
-    }
-    body { font-family: "Segoe UI", Roboto, Arial, sans-serif; margin: 24px; background: #f4f6f8; color: var(--text); }
-    .card { background: white; border-radius: 8px; box-shadow: 0 6px 18px rgba(20,30,40,0.06); padding: 18px; max-width: 1150px; margin: 0 auto; }
-    h2 { margin-bottom: 12px; font-size: 20px; }
-    form.search-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
-    form.search-row input, form.search-row select { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; min-width: 160px; }
-    form.search-row button { padding: 9px 14px; border-radius: 6px; border: none; background: linear-gradient(#1976d2,#0f63b8); color: white; font-weight: 600; cursor: pointer; }
-    form.search-row button:active { transform: translateY(1px); }
-    .table-wrap { overflow-x: auto; margin-top: 16px; }
-    table.excel { border-collapse: collapse; width: 100%; min-width: 950px; font-size: 14px; }
-    table.excel th, table.excel td { border: 1px solid var(--border); padding: 8px 10px; text-align: center; }
-    table.excel thead th { background: var(--excel-header); font-weight: 700; }
-    table.excel tbody tr:nth-child(odd) { background: var(--zebra1); }
-    table.excel tbody tr:nth-child(even) { background: var(--zebra2); }
-    table.excel tbody tr:hover { background: #eef5ff; }
-    .highlight { background: var(--excel-highlight) !important; font-weight: bold; }
-    .no-data { margin-top: 16px; color: #666; }
-</style>
-</head>
-<body>
-<div class="card">
-    <h2>Manage Students</h2>
-    <form class="search-row" method="POST">
-        <input type="text" name="name" placeholder="Enter Student Name" value="<?= htmlspecialchars($search_name) ?>">
-        
-        <select name="department" required onchange="this.form.submit()">
-            <option value="">-- Select Department --</option>
-            <?php foreach ($departments as $d): ?>
-                <option value="<?= htmlspecialchars($d['department_name']) ?>" <?= ($d['department_name']==$selected_dept)?'selected':'' ?>>
-                    <?= htmlspecialchars($d['department_name']) ?>
-                </option>
-            <?php endforeach; ?>
-        </select>
-        
-        <select name="semester" required>
-            <option value="">-- Select Semester --</option>
-            <?php for ($i=1; $i<=$total_semesters; $i++): ?>
-                <option value="<?= $i ?>" <?= ($selected_sem==$i)?'selected':'' ?>>
-                    <?= $i ?><?= ($i==1?'st':($i==2?'nd':($i==3?'rd':'th'))) ?> Semester
-                </option>
-            <?php endfor; ?>
-        </select>
-        
-        <button type="submit">Search</button>
-    </form>
 
-    <?php if ($_SERVER['REQUEST_METHOD']==='POST'): ?>
-        <?php if (!empty($students)): ?>
-            <div class="table-wrap">
-                <table class="excel">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Full Name</th>
-                            <th>Symbol No</th>
-                            <th>Semester</th>
-                            <th>Batch Year</th>
-                            <th>Department</th>
-                            <th>Email</th>
-                            <th>Phone</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php $i=1; foreach ($students as $stu): ?>
-                            <tr class="<?= in_array($stu['id'],$highlight_ids)?'highlight':'' ?>">
-                                <td><?= $i ?></td>
-                                <td><?= htmlspecialchars($stu['full_name']) ?></td>
-                                <td><?= htmlspecialchars($stu['symbol_no']) ?></td>
-                                <td><?= htmlspecialchars($stu['semester']) ?></td>
-                                <td><?= htmlspecialchars($stu['batch_year']) ?></td>
-                                <td><?= htmlspecialchars($stu['department']) ?></td>
-                                <td><?= htmlspecialchars($stu['email']) ?></td>
-                                <td><?= htmlspecialchars($stu['phone'] ?? '-') ?></td>
-                            </tr>
-                        <?php $i++; endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-        <?php else: ?>
-            <p class="no-data">No students found for selected Department & Semester.</p>
-        <?php endif; ?>
-    <?php endif; ?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Search Students</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans min-h-screen flex flex-col">
+
+<div class="flex-grow container mx-auto p-6">
+
+<h2 class="text-3xl font-semibold text-indigo-700 text-center mb-8">Search Students</h2>
+
+<form method="POST" action="student_list.php" class="bg-white p-6 rounded-lg shadow-md flex flex-wrap gap-4 justify-center">
+    <div class="flex flex-col">
+        <label class="font-semibold mb-1">Department:</label>
+        <select name="department" required onchange="this.form.submit()" class="border p-2 rounded">
+            <option value="">-- Select Department --</option>
+            <?php
+            $departments->data_seek(0);
+            while($row = $departments->fetch_assoc()):
+            ?>
+                <option value="<?= $row['id'] ?>" <?= ($selected_dept == $row['id'])?'selected':'' ?>>
+                    <?= $row['department_name'] ?>
+                </option>
+            <?php endwhile; ?>
+        </select>
+    </div>
+
+    <div class="flex flex-col">
+        <label class="font-semibold mb-1">Semester:</label>
+        <select name="semester" required class="border p-2 rounded">
+            <option value="">-- Select Semester --</option>
+            <?php
+            if(isset($semesters_query)){
+                while($row = $semesters_query->fetch_assoc()):
+            ?>
+                <option value="<?= $row['id'] ?>"><?= $row['semester_name'] ?></option>
+            <?php endwhile; } ?>
+        </select>
+    </div>
+
+    <div class="flex flex-col">
+        <label class="font-semibold mb-1">Section:</label>
+        <input type="text" name="section" placeholder="Leave empty for all" class="border p-2 rounded">
+    </div>
+
+    <div class="flex flex-col">
+        <label class="font-semibold mb-1">Batch Year:</label>
+        <input type="number" name="batch_year" placeholder="Leave empty for all" class="border p-2 rounded">
+    </div>
+
+    <div class="flex items-end">
+        <button type="submit" name="search" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded font-semibold">Search</button>
+    </div>
+</form>
+
 </div>
+
+<!-- Tailwind Footer -->
+<footer class="bg-indigo-600 text-white mt-8 p-6">
+  <div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-6">
+    <div>
+      <h5 class="font-semibold mb-2">Quick Links</h5>
+      <ul>
+        <li><a href="index.php" class="hover:underline">Home</a></li>
+        <li><a href="#" class="hover:underline">Our Programs</a></li>
+        <li><a href="about.php" class="hover:underline">About Us</a></li>
+        <li><a href="notice.php" class="hover:underline">Notice Board</a></li>
+      </ul>
+    </div>
+    <div>
+      <h5 class="font-semibold mb-2">Follow Us</h5>
+      <div class="flex gap-2">
+        <a href="https://www.facebook.com/PECPoU" aria-label="Facebook">
+          <img src="https://img.icons8.com/ios-filled/24/ffffff/facebook-new.png" alt="Facebook"/>
+        </a>
+        <a href="https://www.instagram.com/pec.pkr/" aria-label="Instagram">
+          <img src="https://img.icons8.com/ios-filled/24/ffffff/instagram-new.png" alt="Instagram"/>
+        </a>
+      </div>
+    </div>
+    <div>
+      <h5 class="font-semibold mb-2">Contact Us</h5>
+      <p>Phirke Pokhara-8, Nepal</p>
+      <p>Phone: 061 581209</p>
+      <p>Email: info@pec.edu.np</p>
+    </div>
+    <div>
+      <h5 class="font-semibold mb-2">Useful Links</h5>
+      <ul>
+        <li><a href="https://pu.edu.np/" class="hover:underline">Pokhara University</a></li>
+        <li><a href="https://ctevt.org.np/" class="hover:underline">CTEVT</a></li>
+        <li><a href="https://nec.gov.np/" class="hover:underline">Nepal Engineering Council</a></li>
+        <li><a href="https://neanepal.org.np/" class="hover:underline">Nepal Engineer's Association</a></li>
+        <li><a href="https://pu.edu.np/research/purc-seminar-series/" class="hover:underline">PU Research</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="text-center mt-6 text-sm">
+    &copy; 2025 PEC Result Hub. All rights reserved.
+  </div>
+</footer>
+
 </body>
 </html>

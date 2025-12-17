@@ -1,148 +1,122 @@
 <?php
 session_start();
-require_once 'db_config.php';
-require_once 'functions.php';
+require 'db_config.php';
 
-// Check admin login
-if (!isset($_SESSION['admin_logged_in']) || !$_SESSION['admin_logged_in']) {
-    header("Location: admin_login.php");
-    exit;
-}
-
-// Fetch all departments
-$departments = $conn->query("SELECT * FROM departments ORDER BY department_name ASC");
-
-// Add teacher
-if (isset($_POST['add_teacher'])) {
-    $name = trim($_POST['name']);
-    $email = trim($_POST['email']);
-    $contact = trim($_POST['contact']);
-    $is_hod = isset($_POST['is_hod']) ? 1 : 0;
-
-    if ($name && $email) {
-        $stmt = $conn->prepare("INSERT INTO teachers (name,email,contact,is_hod) VALUES (?,?,?,?)");
-        $stmt->bind_param("sssi", $name, $email, $contact, $is_hod);
-        $stmt->execute();
-        $teacher_id = $conn->insert_id;
-
-        // Assign subjects
-        if (!empty($_POST['assignments'])) {
-            foreach ($_POST['assignments'] as $dept_id => $assign) {
-                $semester = intval($assign['semester']);
-                $subject_id = intval($assign['subject']);
-                if ($semester > 0 && $subject_id > 0) {
-                    $stmt2 = $conn->prepare("INSERT INTO teacher_subject_assignments (teacher_id, department_id, semester, subject_id) VALUES (?,?,?,?)");
-                    $stmt2->bind_param("iiii", $teacher_id, $dept_id, $semester, $subject_id);
-                    $stmt2->execute();
-                }
-            }
-        }
-
-        $success = "Teacher added successfully!";
-    } else {
-        $error = "Name and Email are required!";
-    }
-}
-
-// Fetch teachers with assignments
-$teachers = $conn->query("
-    SELECT t.id, t.name, t.email, t.contact, t.is_hod,
-           d.department_name, s.subject_name, tsa.semester
-    FROM teachers t
-    LEFT JOIN teacher_subject_assignments tsa ON t.id = tsa.teacher_id
-    LEFT JOIN departments d ON tsa.department_id = d.id
-    LEFT JOIN subjects_master s ON tsa.subject_id = s.id
-    ORDER BY t.name ASC
-");
+// Fetch teachers ordered by Employee ID
+$teachers = $conn->query("SELECT id, full_name, email, employee_id, contact FROM teachers ORDER BY employee_id ASC");
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <title>Manage Teachers</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+body {
+    background-color: #f0f2f5;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+footer {
+    background-color: #0d6efd;
+    color: #fff;
+    padding: 20px 0;
+    margin-top: 50px;
+}
+footer a {
+    color: #fff !important;
+    text-decoration: none;
+}
+footer a:hover {
+    text-decoration: underline;
+}
+</style>
 </head>
-<body class="bg-gray-100 font-sans">
+<body>
 
-<div class="container mx-auto p-6">
-  <h2 class="text-2xl font-semibold mb-4">Manage Teachers</h2>
-
-  <?php if (!empty($success)): ?>
-    <div class="bg-green-100 text-green-800 px-4 py-2 mb-4 rounded"><?= $success ?></div>
-  <?php endif; ?>
-  <?php if (!empty($error)): ?>
-    <div class="bg-red-100 text-red-800 px-4 py-2 mb-4 rounded"><?= $error ?></div>
-  <?php endif; ?>
-
-  <!-- Add Teacher Form -->
-  <form method="POST" class="grid grid-cols-1 gap-4 mb-6">
-    <input type="text" name="name" placeholder="Teacher Name" class="border p-2 rounded" required>
-    <input type="email" name="email" placeholder="Email" class="border p-2 rounded" required>
-    <input type="text" name="contact" placeholder="Contact Number" class="border p-2 rounded">
-    <label><input type="checkbox" name="is_hod"> Assign as HOD</label>
-
-    <h3 class="font-semibold mt-4">Assign Subjects</h3>
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      <?php while ($dept = $departments->fetch_assoc()): ?>
-        <div class="border p-2 rounded">
-          <strong><?= htmlspecialchars($dept['department_name']) ?></strong><br>
-          Semester: <input type="number" name="assignments[<?= $dept['id'] ?>][semester]" min="1" max="<?= $dept['total_semesters'] ?>" class="w-16 border p-1 rounded"><br>
-          Subject:
-          <select name="assignments[<?= $dept['id'] ?>][subject]" class="border p-1 rounded w-full">
-            <option value="">Select Subject</option>
-            <?php
-            $dept_id = $dept['id'];
-            $subjects_dept = $conn->query("
-                SELECT sm.*
-                FROM subjects_master sm
-                JOIN subjects_department_semester sds ON sm.id = sds.subject_id
-                WHERE sds.department_id = $dept_id
-                ORDER BY sm.subject_name ASC
-            ");
-            while ($sub = $subjects_dept->fetch_assoc()):
-            ?>
-              <option value="<?= $sub['id'] ?>"><?= htmlspecialchars($sub['subject_name']) ?></option>
-            <?php endwhile; ?>
-          </select>
-        </div>
-      <?php endwhile; ?>
-    </div>
-
-    <button type="submit" name="add_teacher" class="bg-indigo-600 text-white px-4 py-2 rounded mt-4">Add Teacher</button>
-  </form>
-
-  <!-- Teachers List -->
-  <table class="w-full border-collapse bg-white rounded-lg shadow mt-6">
-    <thead class="bg-gray-200">
+<div class="container mt-5">
+  <h3 class="text-center mb-4 text-primary">Manage Teachers</h3>
+  <table class="table table-bordered table-hover align-middle bg-white shadow-sm rounded">
+    <thead class="table-dark">
       <tr>
-        <th class="p-2 border">#</th>
-        <th class="p-2 border">Name</th>
-        <th class="p-2 border">Email</th>
-        <th class="p-2 border">Contact</th>
-        <th class="p-2 border">HOD</th>
-        <th class="p-2 border">Assignments</th>
+        <th>#</th>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Employee ID</th>
+        <th>Contact</th>
+        <th>Action</th>
       </tr>
     </thead>
     <tbody>
-      <?php if ($teachers->num_rows > 0): ?>
-        <?php while($t = $teachers->fetch_assoc()): ?>
-          <tr>
-            <td class="p-2 border"><?= $t['id'] ?></td>
-            <td class="p-2 border"><?= htmlspecialchars($t['name']) ?></td>
-            <td class="p-2 border"><?= htmlspecialchars($t['email']) ?></td>
-            <td class="p-2 border"><?= htmlspecialchars($t['contact']) ?></td>
-            <td class="p-2 border"><?= $t['is_hod'] ? "Yes" : "No" ?></td>
-            <td class="p-2 border">
-              <?= $t['department_name'] ? htmlspecialchars($t['department_name'])." - Sem ".$t['semester']." : ".htmlspecialchars($t['subject_name']) : "" ?>
-            </td>
-          </tr>
-        <?php endwhile; ?>
-      <?php else: ?>
-        <tr><td colspan="6" class="p-4 text-center">No teachers found.</td></tr>
-      <?php endif; ?>
+    <?php
+    $i = 1;
+    while ($t = $teachers->fetch_assoc()) {
+        $tid = $t['id'];
+
+        // Check if teacher has assigned subjects
+        $assign_check = $conn->query("SELECT id FROM teacher_subjects WHERE teacher_id = $tid");
+
+        echo "<tr>
+                <td>{$i}</td>
+                <td>{$t['full_name']}</td>
+                <td>{$t['email']}</td>
+                <td>{$t['employee_id']}</td>
+                <td>{$t['contact']}</td>
+                <td>";
+
+        if ($assign_check && $assign_check->num_rows > 0) {
+            echo "<a href='assigned_subjects.php?teacher_id=$tid' class='btn btn-info btn-sm'>Show Assigned</a>";
+        } else {
+            echo "<a href='assign_subject.php?teacher_id=$tid' class='btn btn-primary btn-sm'>Assign Subject</a>";
+        }
+
+        echo "</td></tr>";
+        $i++;
+    }
+    ?>
     </tbody>
   </table>
 </div>
+
+<!-- ===== Footer ===== -->
+<footer>
+  <div class="container d-flex flex-wrap justify-content-between">
+    <div class="mb-3">
+      <h5>Quick Links</h5>
+      <a href="index.php" class="d-block">Home</a>
+      <a href="#" class="d-block">Our Programs</a>
+      <a href="about.php" class="d-block">About Us</a>
+      <a href="notice.php" class="d-block">Notice Board</a>
+    </div>
+    <div class="mb-3">
+      <h5>Follow Us</h5>
+      <div class="d-flex gap-2">
+        <a href="https://www.facebook.com/PECPoU" aria-label="Facebook">
+          <img src="https://img.icons8.com/ios-filled/24/ffffff/facebook-new.png" alt="Facebook"/>
+        </a>
+        <a href="https://www.instagram.com/pec.pkr/" aria-label="Instagram">
+          <img src="https://img.icons8.com/ios-filled/24/ffffff/instagram-new.png" alt="Instagram"/>
+        </a>
+      </div>
+    </div>
+    <div class="mb-3">
+      <h5>Contact Us</h5>
+      <p>Phirke Pokhara-8, Nepal</p>
+      <p>Phone: 061 581209</p>
+      <p>Email: info@pec.edu.np</p>
+    </div>
+    <div class="mb-3">
+      <h5>Useful Links</h5>
+      <a href="https://pu.edu.np/" class="d-block">Pokhara University</a>
+      <a href="https://ctevt.org.np/" class="d-block">CTEVT</a>
+      <a href="https://nec.gov.np/" class="d-block">Nepal Engineering Council</a>
+      <a href="https://neanepal.org.np/" class="d-block">Nepal Engineer's Association</a>
+      <a href="https://pu.edu.np/research/purc-seminar-series/" class="d-block">PU Research</a>
+    </div>
+  </div>
+  <div class="text-center mt-3">
+    <small>&copy; 2025 PEC Result Hub. All rights reserved.</small>
+  </div>
+</footer>
+
 </body>
 </html>

@@ -12,7 +12,7 @@
     <div class="collapse navbar-collapse" id="mainNavbar">
       <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
         <li class="nav-item">
-          <a class="nav-link <?php if(basename($_SERVER['PHP_SELF'])=='dashboard.php') echo 'active'; ?>" href="dashboard.php">Dashboard</a>
+          <a class="nav-link <?php if(basename($_SERVER['PHP_SELF'])=='index.php') echo 'active'; ?>" href="dashboard.php">Dashboard</a>
         </li>
         <li class="nav-item">
           <a class="nav-link <?php if(basename($_SERVER['PHP_SELF'])=='about.php') echo 'active'; ?>" href="about.php">About</a>

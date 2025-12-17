@@ -2,27 +2,35 @@
 session_start();
 require 'db_config.php';
 
-if(!isset($_SESSION['student_id'])){
+// Only logged-in students allowed
+if(!isset($_SESSION['user_id']) || $_SESSION['user_type'] != 'student'){
     header("Location: index.php");
     exit();
 }
 
-$student_id = $_SESSION['student_id'];
+$student_id = $_SESSION['user_id']; // IMPORTANT
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Edit Profile</title>
+</head>
+<body>
+<h2>Edit Your Profile</h2>
+<form action="student_edit_profile_submit.php" method="post" enctype="multipart/form-data">
+    <label>Full Name:</label>
+    <input type="text" name="full_name" required><br><br>
 
-if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['profile_photo'])){
-    if($_FILES['profile_photo']['error'] == 0){
-        $uploadDir = 'uploads/';
-        if(!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+    <label>Phone:</label>
+    <input type="text" name="phone"><br><br>
 
-        $filename = time().'_'.basename($_FILES['profile_photo']['name']);
-        $targetFile = $uploadDir . $filename;
+    <label>Profile Photo:</label>
+    <input type="file" name="profile_photo"><br><br>
 
-        if(move_uploaded_file($_FILES['profile_photo']['tmp_name'], $targetFile)){
-            $stmt = $conn->prepare("UPDATE students SET profile_photo=? WHERE id=?");
-            $stmt->bind_param("si", $targetFile, $student_id);
-            $stmt->execute();
-        }
-    }
-}
-header("Location: student_dashboard.php");
-exit();
+    <button type="submit">Update Profile</button>
+</form>
+
+<a href="student_dashboard.php">Back to Dashboard</a>
+</body>
+</html>
