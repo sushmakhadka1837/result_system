@@ -1,6 +1,13 @@
 <?php
-// Start the session
 session_start();
+require 'db_config.php';
+
+if(isset($_SESSION['student_id'])){
+    $student_id = $_SESSION['student_id'];
+
+    // Record logout activity
+    $conn->query("INSERT INTO student_activity (student_id, activity_type) VALUES ($student_id, 'logout')");
+}
 
 // Clear all session variables
 session_unset();

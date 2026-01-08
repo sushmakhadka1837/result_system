@@ -31,6 +31,7 @@ require 'db_config.php';
   </style>
 </head>
 <body>
+<?php include 'student_header.php'; ?>
 <div class="container my-5">
     <h1 class="mb-3 text-center">📘 Engineering Notes</h1>
     <p class="text-center mb-5">Find notes, syllabus & past questions for all departments of Pokhara Engineering College.</p>
@@ -62,6 +63,15 @@ require 'db_config.php';
         ?>
     </div>
 </div>
-
+ <button
+        onclick="history.back()"
+        class="w-10 h-10 flex items-center justify-center 
+               rounded-full bg-gray-200 hover:bg-gray-300 
+               text-gray-700 hover:text-gray-900 
+               shadow transition"
+        title="Go Back">
+        ←
+    </button>
+    <?php include 'footer.php'; ?>
 </body>
 </html>

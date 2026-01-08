@@ -2,26 +2,41 @@
 session_start();
 require 'db_config.php';
 
-$dept_id = $_GET['dept_id'] ?? 0;
-$sem_id  = $_GET['sem_id'] ?? 0;
+$dept_id = intval($_GET['dept_id'] ?? 0);
+$sem_id  = intval($_GET['sem_id'] ?? 0);
+$type    = $_GET['type'] ?? ''; // 'ut' or 'assessment'
 
-if(!$dept_id || !$sem_id){
-    die("Invalid request!");
+if(!$dept_id || !$sem_id || !in_array($type, ['ut','assessment'])) {
+    die("Invalid parameters.");
 }
 
-// Update results_publish_status table
-$check = $conn->query("SELECT * FROM results_publish_status WHERE department_id=$dept_id AND semester_id=$sem_id");
+// 1️⃣ Update results_publish_status table
+$check = $conn->query("SELECT * FROM results_publish_status 
+                       WHERE department_id=$dept_id 
+                       AND semester_id=$sem_id 
+                       AND result_type='$type'");
+
 if($check->num_rows > 0){
-    // Update published status
-    $conn->query("UPDATE results_publish_status SET published=1, published_at=NOW() WHERE department_id=$dept_id AND semester_id=$sem_id");
+    $conn->query("UPDATE results_publish_status 
+                  SET published=1, published_at=NOW() 
+                  WHERE department_id=$dept_id AND semester_id=$sem_id AND result_type='$type'");
 } else {
-    // Insert new
-    $conn->query("INSERT INTO results_publish_status (department_id, semester_id, published, published_at) VALUES ($dept_id, $sem_id, 1, NOW())");
+    $conn->query("INSERT INTO results_publish_status(department_id, semester_id, result_type, published, published_at) 
+                  VALUES($dept_id, $sem_id, '$type', 1, NOW())");
 }
 
-// Update all student results of that department and semester as published
-$conn->query("UPDATE results SET published=1 WHERE student_id IN (SELECT id FROM students WHERE department_id=$dept_id AND semester=$sem_id)");
+// 2️⃣ Update results table ONLY if assessment
+if($type === 'assessment'){
+    $conn->query("
+        UPDATE results r
+        JOIN subjects_department_semester sds ON r.subject_id = sds.id
+        SET r.published = 1
+        WHERE sds.department_id = $dept_id
+        AND sds.semester = $sem_id
+        AND r.assessment_raw IS NOT NULL
+    ");
+}
 
-// Redirect back to department page
+// 3️⃣ Redirect back to department page
 header("Location: publish_department.php?dept_id=$dept_id");
-exit;
+exit();

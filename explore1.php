@@ -30,7 +30,7 @@
         <div class="bottom-section">
           <div class="mb-4 text-center">
             <a href="images/extra1.jpg" class="glightbox" data-gallery="bottom-gallery">
-              <img src="images/extra1.jpg" class="img-fluid" alt="Student Life" />
+              <img src="images/expo1.jpg" class="img-fluid" alt="Student Life" />
             </a>
             <p class="mt-2">8th PEC Tech EXPO 2022 को उदघाटन।</p>
           </div>

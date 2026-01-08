@@ -8,22 +8,29 @@ if(!isset($_SESSION['admin_id'])){
     exit();
 }
 
+// Result type to check
+$result_type = $_GET['type'] ?? 'ut'; // default UT, or ?type=assessment
+
 // Fetch all departments
 $departments = $conn->query("SELECT * FROM departments ORDER BY department_name ASC");
 
 // Check if "Publish All Departments" clicked
 if(isset($_POST['publish_all'])){
-    // Loop through departments and semesters
     $dept_res = $conn->query("SELECT * FROM departments");
     while($d = $dept_res->fetch_assoc()){
-        $sem_res = $conn->query("SELECT semester_id FROM semesters WHERE department_id=".$d['id']);
+        $sem_res = $conn->query("SELECT id FROM semesters WHERE department_id=".$d['id']);
         while($s = $sem_res->fetch_assoc()){
-            $conn->query("INSERT INTO results_publish_status (department_id, semester_id, published, published_at) VALUES (".$d['id'].", ".$s['semester_id'].", 1, NOW()) ON DUPLICATE KEY UPDATE published=1, published_at=NOW()");
+            $conn->query("
+                INSERT INTO results_publish_status (department_id, semester_id, result_type, published, published_at)
+                VALUES (".$d['id'].", ".$s['id'].", '$result_type', 1, NOW())
+                ON DUPLICATE KEY UPDATE published=1, published_at=NOW()
+            ");
         }
     }
-    $success = "✅ All departments and semesters published successfully!";
+    $success = "✅ All departments and semesters published successfully for ".strtoupper($result_type)."!";
 }
 ?>
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -32,33 +39,58 @@ if(isset($_POST['publish_all'])){
 </head>
 <body class="bg-light">
 <div class="container mt-4">
-<h3>📢 Publish Student Results</h3>
+<h3>📢 Publish Student Results (<?= strtoupper($result_type) ?>)</h3>
 <hr>
 
+<?php if(isset($success)) echo "<div class='alert alert-success'>$success</div>"; ?>
+
 <form method="post">
-<button type="submit" name="publish_all" class="btn btn-danger mb-3">🚀 Publish All Departments</button>
+<button type="submit" name="publish_all" class="btn btn-danger mb-3">
+    🚀 Publish All Departments
+</button>
 </form>
 
 <table class="table table-bordered bg-white">
 <thead>
 <tr>
 <th>Department</th>
-<th>Action</th>
 <th>Status</th>
+<th>Action</th>
 </tr>
 </thead>
 <tbody>
 <?php while($dept = $departments->fetch_assoc()): ?>
 <tr>
 <td><?= htmlspecialchars($dept['department_name']) ?></td>
-<td>
-<a href="publish_department.php?dept_id=<?= $dept['id'] ?>" class="btn btn-primary btn-sm">View Semesters</a>
-</td>
-<td>
-<?php 
-$check = $conn->query("SELECT published FROM results_publish_status WHERE department_id=".$dept['id']." AND published=1");
-echo ($check->num_rows>0) ? "<span class='badge bg-success'>Published</span>" : "<span class='badge bg-warning'>Pending</span>";
+
+<?php
+$dept_id = $dept['id'];
+
+// Total semesters in this department
+$total_sem = $conn->query("SELECT COUNT(*) as total FROM semesters WHERE department_id=$dept_id")->fetch_assoc()['total'];
+
+// Published semesters for this result type
+$pub_sem = $conn->query("
+    SELECT COUNT(*) as pub FROM results_publish_status
+    WHERE department_id=$dept_id AND result_type='$result_type' AND published=1
+")->fetch_assoc()['pub'];
+
+// Determine status badge
+if($pub_sem == 0){
+    $status_badge = "<span class='badge bg-warning'>Pending</span>";
+} elseif($pub_sem < $total_sem){
+    $status_badge = "<span class='badge bg-info'>Partially Published</span>";
+} else {
+    $status_badge = "<span class='badge bg-success'>Published</span>";
+}
+
+echo "<td>$status_badge</td>";
 ?>
+
+<td>
+<a href="publish_department.php?dept_id=<?= $dept['id'] ?>&type=<?= $result_type ?>" class="btn btn-primary btn-sm">
+    View Semesters
+</a>
 </td>
 </tr>
 <?php endwhile; ?>

@@ -38,13 +38,14 @@ if (isset($_POST['add_subject'])) {
     $semester_id = intval($_POST['semester_id']);
     $section = trim($_POST['section']) ?: null;
     $is_elective = isset($_POST['is_elective']) ? 1 : 0;
+    $subject_type = $_POST['subject_type'] ?? 'Regular';
     $batch_year_input = $_POST['batch_year'] ?? '';
     $batch_year = ($batch_year_input !== '' && intval($batch_year_input) > 2022) ? 1 : null;
 
     if (empty($subject_name) || (!$is_elective && empty($subject_code)) || $credit_hours < 1) {
         $error = "All fields required!";
     } else {
-        // Check duplicate
+        // Check duplicate for non-electives
         if (!$is_elective && $subject_code) {
             $stmt_chk = $conn->prepare("SELECT id FROM subjects_master WHERE subject_code=?");
             $stmt_chk->bind_param("s", $subject_code);
@@ -56,8 +57,8 @@ if (isset($_POST['add_subject'])) {
     }
 
     if (!$error) {
-        $stmt = $conn->prepare("INSERT INTO subjects_master (subject_name, subject_code, credit_hours, is_elective, department_id, semester_id) VALUES (?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("ssiiii", $subject_name, $subject_code, $credit_hours, $is_elective, $department_id, $semester_id);
+        $stmt = $conn->prepare("INSERT INTO subjects_master (subject_name, subject_code, credit_hours, is_elective, subject_type, department_id, semester_id) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("sssisii", $subject_name, $subject_code, $credit_hours, $is_elective, $subject_type, $department_id, $semester_id);
         if ($stmt->execute()) {
             $subject_id = $stmt->insert_id;
 
@@ -79,13 +80,14 @@ if (isset($_POST['edit_subject'])) {
     $subject_code = trim($_POST['subject_code']);
     $credit_hours = floatval($_POST['credit_hours']);
     $is_elective = isset($_POST['is_elective']) ? 1 : 0;
+    $subject_type = $_POST['subject_type'] ?? 'Regular';
     $section = trim($_POST['section']) ?: null;
     $batch_year_input = $_POST['batch_year'] ?? '';
     $batch_year = ($batch_year_input !== '' && intval($batch_year_input) > 2022) ? 1 : null;
 
     if ($subject_id && $subject_name && $credit_hours > 0) {
-        $stmt = $conn->prepare("UPDATE subjects_master SET subject_name=?, subject_code=?, credit_hours=?, is_elective=? WHERE id=?");
-        $stmt->bind_param("sssii", $subject_name, $subject_code, $credit_hours, $is_elective, $subject_id);
+        $stmt = $conn->prepare("UPDATE subjects_master SET subject_name=?, subject_code=?, credit_hours=?, is_elective=?, subject_type=? WHERE id=?");
+        $stmt->bind_param("ssissi", $subject_name, $subject_code, $credit_hours, $is_elective, $subject_type, $subject_id);
         $stmt->execute();
 
         $stmt_map = $conn->prepare("UPDATE subjects_department_semester SET batch_year=?, section=? WHERE subject_id=?");
@@ -197,12 +199,12 @@ if ($filter_department && $filter_semester) {
     <td><?= htmlspecialchars($row['subject_name']) ?></td>
     <td><?= htmlspecialchars($row['subject_code'] ?? '-') ?></td>
     <td><?= $row['credit_hours'] ?></td>
-    <td><?= $row['is_elective']?'Elective':'Regular' ?></td>
+    <td><?= htmlspecialchars($row['subject_type']) ?: ($row['is_elective']==1?'Elective':'Regular') ?></td>
     <td><?= $row['section']??'-' ?></td>
     <td><?= $row['batch_year']??'-' ?></td>
     <td>
         <!-- Edit Button -->
-        <button onclick="editSubject(<?= $row['id'] ?>, '<?= htmlspecialchars(addslashes($row['subject_name'])) ?>', '<?= htmlspecialchars(addslashes($row['subject_code'])) ?>', <?= $row['credit_hours'] ?>, <?= $row['is_elective'] ?>, '<?= $row['section'] ?>', '<?= $row['batch_year'] ?>')" class="bg-yellow-500 text-white px-2 py-1 rounded">Edit</button>
+        <button onclick="editSubject(<?= $row['id'] ?>, '<?= htmlspecialchars(addslashes($row['subject_name'])) ?>', '<?= htmlspecialchars(addslashes($row['subject_code'])) ?>', <?= $row['credit_hours'] ?>, <?= $row['is_elective'] ?>, '<?= $row['subject_type'] ?>', '<?= $row['section'] ?>', '<?= $row['batch_year'] ?>')" class="bg-yellow-500 text-white px-2 py-1 rounded">Edit</button>
 
         <!-- Delete Button -->
         <form method="POST" style="display:inline-block" onsubmit="return confirm('Are you sure?')">
@@ -220,7 +222,6 @@ if ($filter_department && $filter_semester) {
 </div>
 
 <!-- Add/Edit Subject Form -->
-<!-- Add/Edit Subject Form -->
 <div class="bg-white p-6 rounded-lg shadow mb-6">
 <h3 class="text-lg font-semibold mb-4" id="form-title">Add New Subject</h3>
 <form method="POST" class="grid grid-cols-1 gap-4" id="subject-form">
@@ -228,30 +229,36 @@ if ($filter_department && $filter_semester) {
     <input type="text" name="subject_name" placeholder="Subject Name" class="border p-2 rounded" id="subject_name" required>
     <input type="text" name="subject_code" placeholder="Subject Code" class="border p-2 rounded" id="subject_code">
     <input type="number" name="credit_hours" min="1" max="4" placeholder="Credit Hours" class="border p-2 rounded" id="credit_hours" required>
+
     <label class="flex items-center space-x-2">
         <input type="checkbox" name="is_elective" value="1" id="is_elective"> <span>Elective Subject?</span>
     </label>
+
+    <label>Subject Type:</label>
+    <select name="subject_type" id="subject_type" class="border p-2 rounded">
+        <option value="Regular">Regular</option>
+        <option value="Elective">Elective</option>
+        <option value="Project">Project</option>
+    </select>
     
-    <!-- Hidden Batch Year and Section -->
     <input type="hidden" name="batch_year" id="batch_year" value="<?= htmlspecialchars($filter_batch) ?>">
     <input type="hidden" name="section" id="section" value="<?= htmlspecialchars($filter_section) ?>">
-
     <input type="hidden" name="department_id" value="<?= htmlspecialchars($filter_department) ?>">
     <input type="hidden" name="semester_id" value="<?= htmlspecialchars($filter_semester) ?>">
-    
+
     <button type="submit" name="add_subject" id="submit-btn" class="bg-blue-600 text-white px-4 py-2 rounded">Add Subject</button>
 </form>
 </div>
 
-
 <script>
-function editSubject(id, name, code, credit, elective, section, batch) {
+function editSubject(id, name, code, credit, elective, type, section, batch) {
     document.getElementById('form-title').innerText = "Edit Subject";
     document.getElementById('subject_id').value = id;
     document.getElementById('subject_name').value = name;
     document.getElementById('subject_code').value = code;
     document.getElementById('credit_hours').value = credit;
     document.getElementById('is_elective').checked = (elective==1);
+    document.getElementById('subject_type').value = type;
     document.getElementById('section').value = section;
     document.getElementById('batch_year').value = batch;
     document.getElementById('submit-btn').name = "edit_subject";

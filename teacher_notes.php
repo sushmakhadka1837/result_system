@@ -21,6 +21,7 @@ require 'db_config.php';
   </style>
 </head>
 <body>
+  <?php include 'teacher_header.php'; ?>
 <div class="container my-5">
     <h1 class="mb-3 text-center">📘 Engineering Notes (Teacher)</h1>
     <p class="text-center mb-5">Select your department to upload notes.</p>
@@ -43,5 +44,15 @@ require 'db_config.php';
         ?>
     </div>
 </div>
+<?php include 'footer.php'; ?>
+ <button
+        onclick="history.back()"
+        class="w-10 h-10 flex items-center justify-center 
+               rounded-full bg-gray-200 hover:bg-gray-300 
+               text-gray-700 hover:text-gray-900 
+               shadow transition"
+        title="Go Back">
+        ←
+    </button>
 </body>
 </html>

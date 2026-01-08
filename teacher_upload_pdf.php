@@ -15,8 +15,8 @@ $category   = $_GET['category'] ?? 'notes';
 if(isset($_GET['delete'])){
     $delete_id = intval($_GET['delete']);
     $check = $conn->query("
-        SELECT file_path FROM notes 
-        WHERE id='$delete_id' 
+        SELECT file_path FROM notes
+        WHERE id='$delete_id'
         AND uploader_id='$teacher_id'
         AND uploader_role='teacher'
     ");
@@ -48,11 +48,10 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_file'])){
     $allowedExt = ['pdf','doc','docx','zip'];
     $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
 
-    // duplicate title check
     $check = $conn->query("
-        SELECT id FROM notes 
-        WHERE subject_id='$subject_id' 
-        AND note_type='$category' 
+        SELECT id FROM notes
+        WHERE subject_id='$subject_id'
+        AND note_type='$category'
         AND title='$title'
         AND uploader_role='teacher'
     ");
@@ -80,16 +79,15 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_file'])){
 
         if(move_uploaded_file($file['tmp_name'], $path)){
             $conn->query("
-                INSERT INTO notes 
+                INSERT INTO notes
                 (department_id, semester_id, subject_id, title, note_type, file_path, uploader_id, uploader_role, created_at)
                 VALUES
                 ('{$subject['department_id']}','{$subject['semester_id']}','$subject_id',
                  '$title','$category','$path','$teacher_id','teacher',NOW())
             ");
-
             header("Location: teacher_upload_pdf.php?subject_id=$subject_id&category=$category&success=1");
             exit();
-        } else {
+        }else{
             $uploadMsg = "File upload failed!";
         }
     }
@@ -99,19 +97,16 @@ if(isset($_GET['success'])){
     $uploadMsg = "Notes uploaded successfully!";
 }
 
-/* ---------- FETCH ALL NOTES ---------- */
+/* ---------- FETCH NOTES ---------- */
 $files = $conn->query("
-    SELECT 
-        n.*,
-        CASE 
-            WHEN n.uploader_role='teacher' THEN t.full_name
-            ELSE s.full_name
-        END AS uploader_name
+    SELECT n.*,
+    CASE
+        WHEN n.uploader_role='teacher' THEN t.full_name
+        ELSE s.full_name
+    END AS uploader_name
     FROM notes n
-    LEFT JOIN teachers t 
-        ON t.id = n.uploader_id AND n.uploader_role='teacher'
-    LEFT JOIN students s 
-        ON s.id = n.uploader_id AND n.uploader_role='student'
+    LEFT JOIN teachers t ON t.id=n.uploader_id AND n.uploader_role='teacher'
+    LEFT JOIN students s ON s.id=n.uploader_id AND n.uploader_role='student'
     WHERE n.subject_id='$subject_id'
     AND n.note_type='$category'
     ORDER BY n.id DESC
@@ -124,13 +119,26 @@ $files = $conn->query("
 <title>Upload Notes - Teacher</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
 <style>
+html, body{
+    height:100%;
+}
+
 body{
-    display:flex;
-    padding:20px;
+    margin:0;
     background:#f4f6f8;
     font-family: Arial;
+    display:flex;
+    flex-direction:column;
 }
+
+.page-wrapper{
+    flex:1;
+    display:flex;
+    padding:20px;
+}
+
 .sidebar{
     width:320px;
     background:#fff;
@@ -138,10 +146,12 @@ body{
     border-radius:8px;
     box-shadow:0 0 10px rgba(0,0,0,0.08);
 }
+
 .content{
     flex:1;
     margin-left:20px;
 }
+
 .file-card{
     background:#fff;
     border-radius:8px;
@@ -151,137 +161,122 @@ body{
     margin-bottom:15px;
     box-shadow:0 3px 8px rgba(0,0,0,0.08);
     align-items:center;
-    transition: transform 0.2s, box-shadow 0.2s;
 }
-.file-card:hover{
-    transform: translateY(-3px);
-    box-shadow:0 5px 15px rgba(0,0,0,0.2);
-}
+
 .file-card img{
     width:70px;
     height:90px;
     object-fit:contain;
     cursor:pointer;
 }
-.file-card img:hover{
-    opacity:0.8;
-}
-.file-info h6{
-    margin:0;
-    cursor:pointer;
-}
-.file-info small{
-    color:#666;
-}
+
 .action-icons a{
     margin-left:10px;
     color:#555;
-    font-size:16px;
 }
-.action-icons a:hover{
-    color:#0d6efd;
-}
+
 .action-icons .delete:hover{
     color:red;
 }
-.back-btn{
-    margin-bottom:15px;
+
+footer{
+    background:#0d6efd;
+    color:#fff;
+    text-align:center;
+    padding:15px;
 }
 </style>
+
 <script>
 function copyLink(link){
     navigator.clipboard.writeText(window.location.origin + "/" + link);
     alert("Link copied!");
 }
-
 function openFile(link){
     window.open(link,'_blank');
 }
-
-function goBack(){
-    window.history.back();
-}
 </script>
 </head>
+
 <body>
+<?php include 'teacher_header.php'; ?>
+<div class="page-wrapper">
 
-<!-- LEFT UPLOAD -->
-<div class="sidebar">
-    <!-- BACK BUTTON -->
-    <button class="btn btn-secondary back-btn" onclick="goBack()">&larr; Back</button>
+    <!-- LEFT -->
+    <div class="sidebar">
+        
 
-    <h5>Upload Notes (Teacher)</h5>
-    <?php if($uploadMsg!=""): ?>
-        <div class="alert alert-success"><?= $uploadMsg ?></div>
-    <?php endif; ?>
+        <h5>Upload Notes</h5>
 
-    <form method="POST" enctype="multipart/form-data">
-        <label class="mt-2">Title</label>
-        <input type="text" name="title" class="form-control mb-2" required>
+        <?php if($uploadMsg!=""): ?>
+            <div class="alert alert-success"><?= $uploadMsg ?></div>
+        <?php endif; ?>
 
-        <label>File (PDF/DOC/DOCX/ZIP – max 50MB)</label>
-        <input type="file" name="file_upload" class="form-control mb-3" required>
+        <form method="POST" enctype="multipart/form-data">
+            <label>Title</label>
+            <input type="text" name="title" class="form-control mb-2" required>
 
-        <button name="upload_file" class="btn btn-primary w-100">
-            Upload Notes
-        </button>
-    </form>
+            <label>File</label>
+            <input type="file" name="file_upload" class="form-control mb-3" required>
+
+            <button name="upload_file" class="btn btn-primary w-100">
+                Upload Notes
+            </button>
+        </form>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="content">
+        <h4>Uploaded Notes</h4>
+
+        <?php if($files->num_rows > 0): ?>
+            <?php while($f = $files->fetch_assoc()): ?>
+                <?php
+                $ext = pathinfo($f['file_path'], PATHINFO_EXTENSION);
+                if($ext=='pdf') $icon="https://cdn-icons-png.flaticon.com/512/337/337946.png";
+                elseif(in_array($ext,['doc','docx'])) $icon="https://cdn-icons-png.flaticon.com/512/337/337932.png";
+                elseif($ext=='zip') $icon="https://cdn-icons-png.flaticon.com/512/716/716784.png";
+                else $icon="https://cdn-icons-png.flaticon.com/512/109/109612.png";
+                ?>
+
+                <div class="file-card">
+                    <img src="<?= $icon ?>" onclick="openFile('<?= $f['file_path'] ?>')">
+
+                    <div class="flex-grow-1" onclick="openFile('<?= $f['file_path'] ?>')">
+                        <h6><?= htmlspecialchars($f['title']) ?></h6>
+                        <small>
+                            Uploaded by <b><?= $f['uploader_name'] ?></b>
+                        </small>
+                    </div>
+
+                    <div class="action-icons">
+                        <a href="<?= $f['file_path'] ?>" download><i class="fas fa-download"></i></a>
+                        <a href="<?= $f['file_path'] ?>" target="_blank"><i class="fas fa-eye"></i></a>
+                        <?php if($f['uploader_id']==$teacher_id): ?>
+                            <a href="?subject_id=<?= $subject_id ?>&category=<?= $category ?>&delete=<?= $f['id'] ?>"
+                               onclick="return confirm('Delete?')" class="delete">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            <?php endwhile; ?>
+        <?php else: ?>
+            <p class="text-muted">No notes uploaded yet.</p>
+        <?php endif; ?>
+    </div>
+
 </div>
 
-<!-- RIGHT CONTENT -->
-<div class="content">
-    <h4>Uploaded Notes</h4>
-
-    <?php if($files->num_rows > 0): ?>
-        <?php while($f = $files->fetch_assoc()): ?>
-            <?php
-            $ext = pathinfo($f['file_path'], PATHINFO_EXTENSION);
-            if($ext=='pdf')      $icon="https://cdn-icons-png.flaticon.com/512/337/337946.png";
-            elseif(in_array($ext,['doc','docx'])) $icon="https://cdn-icons-png.flaticon.com/512/337/337932.png";
-            elseif($ext=='zip')  $icon="https://cdn-icons-png.flaticon.com/512/716/716784.png";
-            else                 $icon="https://cdn-icons-png.flaticon.com/512/109/109612.png";
-            ?>
-
-            <div class="file-card">
-                <img src="<?= $icon ?>" onclick="openFile('<?= $f['file_path'] ?>')" title="Click to view">
-
-                <div class="file-info flex-grow-1" onclick="openFile('<?= $f['file_path'] ?>')">
-                    <h6><?= htmlspecialchars($f['title']) ?></h6>
-                    <small>
-                        Uploaded by: <b><?= htmlspecialchars($f['uploader_name']) ?></b>
-                        (<?= ucfirst($f['uploader_role']) ?>)
-                    </small>
-                </div>
-
-                <div class="action-icons text-end">
-                    <a href="<?= $f['file_path'] ?>" download title="Download">
-                        <i class="fas fa-download"></i>
-                    </a>
-
-                    <a href="<?= $f['file_path'] ?>" target="_blank" title="Open">
-                        <i class="fas fa-eye"></i>
-                    </a>
-
-                    <a href="javascript:void(0)"
-                       onclick="copyLink('<?= $f['file_path'] ?>')"
-                       title="Copy Link">
-                        <i class="fas fa-share-alt"></i>
-                    </a>
-
-                    <?php if($f['uploader_role']=='teacher' && $f['uploader_id']==$teacher_id): ?>
-                        <a href="?subject_id=<?= $subject_id ?>&category=<?= $category ?>&delete=<?= $f['id'] ?>"
-                           onclick="return confirm('Delete this note?')"
-                           class="delete" title="Delete">
-                            <i class="fas fa-trash"></i>
-                        </a>
-                    <?php endif; ?>
-                </div>
-            </div>
-        <?php endwhile; ?>
-    <?php else: ?>
-        <p class="text-muted">No notes uploaded yet.</p>
-    <?php endif; ?>
-</div>
-
+<?php include 'footer.php'; ?>
+ <button
+        onclick="history.back()"
+        class="w-10 h-10 flex items-center justify-center 
+               rounded-full bg-gray-200 hover:bg-gray-300 
+               text-gray-700 hover:text-gray-900 
+               shadow transition"
+        title="Go Back">
+        ←
+    </button>
 </body>
 </html>

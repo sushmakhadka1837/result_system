@@ -2,22 +2,27 @@
 session_start();
 require 'db_config.php';
 
-if(!isset($_SESSION['teacher_id'])){
-    header("Location: teacher_login.php");
-    exit();
+if(!isset($_SESSION['teacher_id']) || $_SESSION['user_type']!='teacher'){
+    die("Teacher not logged in");
 }
 
-$teacher_id = $_SESSION['teacher_id'];
-$student_id = $_POST['student_id'] ?? 0;
-$message = $_POST['message'] ?? '';
-
-if($student_id && $message){
-    $stmt = $conn->prepare("INSERT INTO messages (sender_type, sender_id, receiver_id, message) VALUES ('teacher', ?, ?, ?)");
-    $stmt->bind_param("iis", $teacher_id, $student_id, $message);
-    $stmt->execute();
-    $stmt->close();
+if(empty($_POST['receiver_id']) || empty($_POST['message'])){
+    die("Missing data");
 }
 
-// Redirect back to the same chat
-header("Location: teacher_chat.php?student_id=".$student_id);
-exit();
+$teacher_id = intval($_SESSION['teacher_id']);
+$student_id = intval($_POST['receiver_id']);
+$message = trim($_POST['message']);
+
+if($message=='') die("Empty message");
+
+$stmt = $conn->prepare("INSERT INTO messages (sender_id, receiver_id, message, sender_type, is_read) VALUES (?, ?, ?, 'teacher', 0)");
+$stmt->bind_param("iis", $teacher_id, $student_id, $message);
+
+if($stmt->execute()){
+    echo "SUCCESS";
+}else{
+    echo "ERROR: ".$conn->error;
+}
+
+$stmt->close();

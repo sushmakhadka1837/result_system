@@ -1,98 +1,20 @@
 <?php
 session_start();
+// common.php vitra getCurrentSemester($batch_year) function huna parcha
+require 'common.php'; 
 require 'db_config.php';
-require 'otp_mailer.php'; // sendOTP function
+require 'otp_mailer.php'; 
 
-// Fetch all departments
+// 1. Fetch all departments
 $departments = [];
-$dept_result = $conn->query("SELECT id, department_name, total_semesters FROM departments ORDER BY department_name ASC");
+$dept_result = $conn->query("SELECT id, department_name FROM departments ORDER BY department_name ASC");
 if($dept_result){
     while($row = $dept_result->fetch_assoc()){
         $departments[] = $row;
     }
 }
 
-$error = '';
-$success = '';
-
-if($_SERVER['REQUEST_METHOD'] === 'POST'){
-    $full_name = trim($_POST['full_name']);
-    $email = trim($_POST['email']);
-    $phone = trim($_POST['phone']);
-    $password = trim($_POST['password']);
-    $department_id = trim($_POST['department']);
-    $batch_year = trim($_POST['batch_year']);
-    $semester_id = trim($_POST['semester']); // now stores semester_id
-    $section = trim($_POST['section']) ?: NULL;
-    $faculty = trim($_POST['faculty']);
-    $symbol_no = trim($_POST['symbol_no']);
-    $dob = trim($_POST['dob']);
-
-    // Get department name
-    $department_name = '';
-    foreach($departments as $dept){
-        if($dept['id'] == $department_id){
-            $department_name = $dept['department_name'];
-            break;
-        }
-    }
-
-    if(!empty($full_name) && !empty($email) && !empty($phone) && !empty($password) && !empty($department_id) && !empty($batch_year) && !empty($semester_id) && !empty($faculty) && !empty($symbol_no) && !empty($dob)) {
-
-        // Check if student exists
-        $stmt = $conn->prepare("SELECT * FROM students WHERE email=? OR symbol_no=? OR phone=?");
-        $stmt->bind_param("sss", $email, $symbol_no, $phone);
-        $stmt->execute();
-        $result = $stmt->get_result();
-
-        if($result->num_rows > 0){
-            $error = "Email, Symbol Number, or Phone already registered!";
-        } else {
-            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-            $otp = rand(100000, 999999);
-            $otp_expiry = date("Y-m-d H:i:s", strtotime('+10 minutes'));
-
-            // Insert student
-            $stmt = $conn->prepare("
-                INSERT INTO students (full_name, email, phone, password, department, department_id, batch_year, semester, section, faculty, symbol_no, dob, otp, otp_expiry) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ");
-            $stmt->bind_param(
-                "sssssiisssssss", 
-                $full_name, 
-                $email, 
-                $phone, 
-                $hashed_password, 
-                $department_name, 
-                $department_id, 
-                $batch_year, 
-                $semester_id, 
-                $section, 
-                $faculty, 
-                $symbol_no, 
-                $dob, 
-                $otp, 
-                $otp_expiry
-            );
-
-            if($stmt->execute()){
-                $_SESSION['pending_user_id'] = $conn->insert_id;
-                if(sendOTP($email, $full_name, $otp, 'student')){
-                    header("Location: student_otp_verification.php");
-                    exit;
-                } else {
-                    $success = "Signup successful but failed to send OTP email. Please check your email address.";
-                }
-            } else {
-                $error = "Error while registering. Try again!";
-            }
-        }
-    } else {
-        $error = "Please fill all required fields.";
-    }
-}
-
-// Fetch semesters via AJAX
+// 2. AJAX Fetch Semesters
 if(isset($_GET['get_semesters']) && isset($_GET['department_id'])){
     $dept_id = (int)$_GET['department_id'];
     $semesters = [];
@@ -106,87 +28,208 @@ if(isset($_GET['get_semesters']) && isset($_GET['department_id'])){
     echo json_encode($semesters);
     exit;
 }
+
+$error = '';
+$success = '';
+
+// 3. Handle Registration
+if($_SERVER['REQUEST_METHOD'] === 'POST'){
+    $full_name     = trim($_POST['full_name']);
+    $email         = trim($_POST['email']);
+    $phone         = trim($_POST['phone']);
+    $password      = trim($_POST['password']);
+    $department_id = trim($_POST['department']);
+    $semester_id   = trim($_POST['semester']);
+    $batch_year    = trim($_POST['batch_year']);
+    $symbol_no     = trim($_POST['symbol_no']);
+    $dob           = trim($_POST['dob']);
+    $faculty       = trim($_POST['faculty']);
+    $section       = trim($_POST['section']) ?: NULL;
+
+    if(empty($full_name) || empty($email) || empty($batch_year)){
+        $error = "Please fill all required fields!";
+    } else {
+        // Check duplicate
+        $stmt = $conn->prepare("SELECT id FROM students WHERE email=? OR symbol_no=? OR phone=?");
+        $stmt->bind_param("sss", $email, $symbol_no, $phone);
+        $stmt->execute();
+        if($stmt->get_result()->num_rows > 0){
+            $error = "Email, Symbol Number, or Phone already registered!";
+        } else {
+            // Get Dept & Sem names
+            $dept_q = $conn->query("SELECT department_name FROM departments WHERE id=$department_id");
+            $d_name = $dept_q->fetch_assoc()['department_name'];
+            
+            $sem_q = $conn->query("SELECT semester_name FROM semesters WHERE id=$semester_id");
+            $s_name = $sem_q->fetch_assoc()['semester_name'];
+
+            // logic from common.php
+            $auto_current_semester = getCurrentSemester($batch_year);
+
+            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+            $otp = rand(100000, 999999);
+            $otp_expiry = date("Y-m-d H:i:s", strtotime('+10 minutes'));
+
+            // Insert including current_semester
+            $ins = $conn->prepare("INSERT INTO students (full_name, email, phone, password, department, department_id, batch_year, semester, semester_id, section, faculty, symbol_no, dob, otp, otp_expiry, current_semester, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')");
+            
+            // 16 parameters (s s s s s i i s i s s s s i s i)
+            $ins->bind_param("sssssiississsssi", 
+                $full_name, $email, $phone, $hashed_password, $d_name, $department_id, 
+                $batch_year, $s_name, $semester_id, $section, $faculty, $symbol_no, 
+                $dob, $otp, $otp_expiry, $auto_current_semester
+            );
+
+            if($ins->execute()){
+                $_SESSION['pending_user_id'] = $conn->insert_id;
+                if(sendOTP($email, $full_name, $otp, 'student')){
+                    header("Location: student_otp_verification.php");
+                    exit;
+                } else {
+                    $success = "Registered but OTP failed. Contact support.";
+                }
+            } else {
+                $error = "Database Error: " . $conn->error;
+            }
+        }
+    }
+}
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Student Signup</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-<style>
-body { font-family: Arial, sans-serif; background-color: #f9f9f9; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-.signup-card { background-color: #fff; padding: 30px 35px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 400px; text-align: center; }
-.signup-card h2 { margin-bottom: 20px; color: #333; }
-.signup-card input, .signup-card select { width: 100%; padding: 10px 12px; margin-bottom: 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
-.signup-card button { width: 100%; padding: 10px; margin-top: 10px; background-color: #4CAF50; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 15px; }
-.signup-card button:hover { background-color: #45a049; }
-.error { color: red; font-size: 14px; margin-bottom: 10px; }
-.success { color: green; font-size: 14px; margin-bottom: 10px; }
-</style>
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script>
-function updateSemesterOptions() {
-    var deptId = $('select[name="department"]').val();
-    var semSelect = $('select[name="semester"]');
-    semSelect.html('<option value="">Loading...</option>');
-    if(deptId){
-        $.get('<?= $_SERVER['PHP_SELF'] ?>', {get_semesters:1, department_id:deptId}, function(data){
-            var options = '<option value="">Select Semester</option>';
-            data.forEach(function(sem){
-                options += '<option value="'+sem.id+'">'+sem.semester_name+'</option>';
-            });
-            semSelect.html(options);
-        }, 'json');
-    } else {
-        semSelect.html('<option value="">Select Semester</option>');
-    }
-}
-
-$(document).ready(function(){
-    $('select[name="department"]').change(updateSemesterOptions);
-});
-</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Registration | Portal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background: #f0f2f5; font-family: 'Inter', sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 40px 0; }
+        .signup-card { background: #fff; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); width: 100%; max-width: 750px; overflow: hidden; border: none; }
+        .card-header-gradient { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; padding: 30px; text-align: center; }
+        .form-content { padding: 40px; }
+        .form-label { font-weight: 600; font-size: 0.8rem; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
+        .form-control, .form-select { padding: 12px; border-radius: 8px; border: 1px solid #dee2e6; font-size: 0.95rem; }
+        .btn-register { background: #2a5298; color: white; border: none; padding: 14px; border-radius: 8px; font-weight: 700; width: 100%; margin-top: 20px; transition: 0.3s; }
+        .btn-register:hover { background: #1e3c72; transform: translateY(-2px); }
+        .input-group-text { background-color: #f8f9fa; border-color: #dee2e6; color: #6c757d; }
+    </style>
 </head>
 <body>
+
 <div class="signup-card">
-    <h2>Student Signup</h2>
+    <div class="card-header-gradient">
+        <h3 class="mb-1">Create Student Account</h3>
+        <p class="mb-0 opacity-75">Join the academic resource network</p>
+    </div>
 
-    <?php
-        if($error) echo '<div class="error">'.$error.'</div>';
-        if($success) echo '<div class="success">'.$success.'</div>';
-    ?>
-
-    <form method="POST" action="">
-        <input type="text" name="full_name" placeholder="Full Name" required>
-        <input type="email" name="email" placeholder="Email" required>
-        <input type="text" name="phone" placeholder="Phone Number" required>
-        <input type="password" name="password" placeholder="Password" required>
+    <div class="form-content">
+        <?php if($error) echo '<div class="alert alert-danger py-2 small"><i class="fa fa-circle-exclamation me-2"></i>'.$error.'</div>'; ?>
         
-        <select name="department" required>
-            <option value="">Select Department</option>
-            <?php foreach($departments as $dept): ?>
-                <option value="<?= $dept['id'] ?>"><?= htmlspecialchars($dept['department_name']) ?></option>
-            <?php endforeach; ?>
-        </select>
+        <form method="POST">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Full Name</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fa fa-user-circle"></i></span>
+                        <input type="text" name="full_name" class="form-control" placeholder="Ram Bahadur" required>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Email Address</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fa fa-envelope"></i></span>
+                        <input type="email" name="email" class="form-control" placeholder="name@college.com" required>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Phone Number</label>
+                    <input type="text" name="phone" class="form-control" placeholder="98XXXXXXXX" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Password</label>
+                    <input type="password" name="password" class="form-control" placeholder="••••••••" required>
+                </div>
 
-        <select name="semester" required>
-            <option value="">Select Semester</option>
-        </select>
+                <hr class="my-3 opacity-25">
 
-        <input type="text" name="batch_year" placeholder="Batch Year (e.g. 2024)" required>
-        <input type="text" name="faculty" placeholder="Faculty" required>
-        <input type="text" name="symbol_no" placeholder="Symbol Number" required>
-        <input type="date" name="dob" placeholder="Date of Birth" required>
+                <div class="col-md-6">
+                    <label class="form-label">Department</label>
+                    <select name="department" class="form-select" required>
+                        <option value="">Choose Department</option>
+                        <?php foreach($departments as $dept): ?>
+                            <option value="<?= $dept['id'] ?>"><?= htmlspecialchars($dept['department_name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Semester</label>
+                    <select name="semester" class="form-select" required>
+                        <option value="">Select Department First</option>
+                    </select>
+                </div>
 
-        <select name="section">
-            <option value="">None</option>
-            <option value="A">A</option>
-            <option value="B">B</option>
-        </select>
+                <div class="col-md-4">
+                    <label class="form-label">Batch Year</label>
+                    <input type="number" name="batch_year" class="form-control" placeholder="2023" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Symbol No</label>
+                    <input type="text" name="symbol_no" class="form-control" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Date of Birth</label>
+                    <input type="date" name="dob" class="form-control" required>
+                </div>
 
-        <button type="submit">Signup</button>
-    </form>
+                <div class="col-md-6">
+                    <label class="form-label">Faculty</label>
+                    <input type="text" name="faculty" class="form-control" placeholder="e.g. Science & Tech" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Section (Optional)</label>
+                    <select name="section" class="form-select">
+                        <option value="">None</option>
+                        <option value="A">Section A</option>
+                        <option value="B">Section B</option>
+                    </select>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-register">
+                REGISTER NOW <i class="fa fa-paper-plane ms-2"></i>
+            </button>
+            
+            <div class="text-center mt-4">
+                <span class="text-muted small">Already registered?</span> 
+                <a href="login.php" class="text-decoration-none fw-bold small ms-1" style="color: #2a5298;">Login Here</a>
+            </div>
+        </form>
+    </div>
 </div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+$(document).ready(function(){
+    $('select[name="department"]').change(function(){
+        var deptId = $(this).val();
+        var semSelect = $('select[name="semester"]');
+        semSelect.html('<option value="">Fetching...</option>');
+        
+        if(deptId){
+            $.get('<?= $_SERVER['PHP_SELF'] ?>', {get_semesters:1, department_id:deptId}, function(data){
+                var options = '<option value="">Select Semester</option>';
+                data.forEach(function(sem){
+                    options += '<option value="'+sem.id+'">'+sem.semester_name+'</option>';
+                });
+                semSelect.html(options);
+            }, 'json');
+        } else {
+            semSelect.html('<option value="">Select Department First</option>');
+        }
+    });
+});
+</script>
 </body>
 </html>

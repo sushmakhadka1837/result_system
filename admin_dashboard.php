@@ -50,7 +50,7 @@ $page_title = "Admin Dashboard";
       <a href="manage_students.php" class="block px-3 py-2 rounded hover:bg-gray-700">Manage Students</a>
       <a href="manage_teachers.php" class="block px-3 py-2 rounded hover:bg-gray-700">Manage Teachers</a>
       <a href="admin_publish_results.php" class="block px-3 py-2 rounded hover:bg-gray-700">Publish Results</a>
-      <a href="admin_settings.php" class="block px-3 py-2 rounded hover:bg-gray-700">Settings</a>
+      <a href="manage_feedback.php" class="block px-3 py-2 rounded hover:bg-gray-700">Manage Feedback</a>
       <a href="activity_log.php" class="block px-3 py-2 rounded hover:bg-gray-700">Activity Log</a>
     </nav>
   </aside>
@@ -78,19 +78,14 @@ $page_title = "Admin Dashboard";
         <h3 class="text-gray-500">Subjects</h3>
         <p class="text-2xl font-bold"><?= getTotalCount('subjects_master', $conn); ?></p>
       </div>
-      <div class="bg-white rounded-lg p-5 shadow">
-        <h3 class="text-gray-500">Pending Results</h3>
-        <p class="text-2xl font-bold"><?= getPendingResultsCount($conn); ?></p>
-      </div>
+    
       <div class="bg-white rounded-lg p-5 shadow">
         <h3 class="text-gray-500">Last Login</h3>
         <p class="text-xl"><?= htmlspecialchars($last_login); ?></p>
       </div>
     </div>
 
-    <!-- =========================
-         Upload Notes Section
-    ========================= -->
+    
 
 
   </main>

@@ -1,50 +1,45 @@
-<?php
 
-?>
 
-<!-- Top Header -->
-<div class="top-header">
-  <div></div>
-  <div class="info text-end">
-    <div>Phirke 08, Pokhara, Nepal 🇳🇵</div>
-    <div>📞 +977 061-581209 / 575926</div>
-    <div><a href="#" class="text-decoration-none">📧 Contact Us</a></div>
-  </div>
-</div>
 
-<!-- Navbar -->
-<nav class="navbar navbar-expand-lg navbar-dark shadow-sm">
-  <div class="container">
+<!-- Navbar / Main Header -->
+<nav class="navbar navbar-expand-lg navbar-dark shadow-sm" style="background:#001f4d;">
+  <div class="container d-flex align-items-center justify-content-between">
+    
+    <!-- Logo -->
     <a class="navbar-brand d-flex align-items-center" href="index.php">
-      <img src="images.png" alt="PEC Logo" width="400" height="50" class="me-2">
-      <span class="fw-bold text-dark">PEC Result Hub</span>
+      <img src="images/logoheader.png" alt="PEC Logo" class="logo-round">
     </a>
+
+    <!-- Contact Info -->
+    <div class="header-info d-flex flex-column text-white text-end">
+      <div>Phirke 08, Pokhara, Nepal 🇳🇵</div>
+      <div>📞 +977 061-581209 / 575926</div>
+      <div><a href="#" class="text-decoration-none text-white">📧 Contact Us</a></div>
+    </div>
+
+    <!-- Navbar Links -->
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar">
       <span class="navbar-toggler-icon"></span>
     </button>
+
     <div class="collapse navbar-collapse" id="mainNavbar">
       <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
-
         <li class="nav-item"><a class="nav-link" href="index.php">Dashboard</a></li>
         <li class="nav-item"><a class="nav-link" href="aboutus.php">About</a></li>
         <li class="nav-item"><a class="nav-link" href="engineering_notes.php">Notes</a></li>
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Results</a>
           <ul class="dropdown-menu dropdown-menu-dark">
-            <li><a class="dropdown-item" href="view_results.php">View Results</a></li>
+            <li><a class="dropdown-item" href="results.php">View Results</a></li>
           </ul>
         </li>
-
-      <li class="nav-item dropdown">
-  <a class="nav-link dropdown-toggle" href="#" id="noticeDropdown" data-bs-toggle="dropdown">Notice</a>
-  <ul class="dropdown-menu" aria-labelledby="noticeDropdown">
-   
-    <li><a class="dropdown-item" href="notice.php?category=college_updates">College Updates</a></li>
-
-    <li><a class="dropdown-item" href="https://pu.edu.np/notices/">PU Related</a></li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="noticeDropdown" data-bs-toggle="dropdown">Notice</a>
+          <ul class="dropdown-menu" aria-labelledby="noticeDropdown">
+            <li><a class="dropdown-item" href="college_updates.php">College Updates</a></li>
+            <li><a class="dropdown-item" href="https://pu.edu.np/notices/">PU Related</a></li>
           </ul>
-      </li>
-
+        </li>
         <li class="nav-item dropdown">
           <?php
           $user_type = $_SESSION['user_type'] ?? null;
@@ -64,63 +59,116 @@
               </ul>
           <?php endif; ?>
         </li>
-
       </ul>
     </div>
+
   </div>
 </nav>
 
 <style>
-/* Top Header */
-.top-header {
-    background-color: #ffffff;
-    padding: 10px 20px;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 2px solid #001f4d;
+ body {
+      font-family: 'Poppins', sans-serif;
+      background: #f5f6fa;
+  }
+.navbar{
+    background:#001f4d !important;
+    padding:5px 20px;
 }
-.top-header .info div, .top-header .info a {
-    font-size: 0.85rem;
-    color: #001f4d;
+.navbar-nav {
+    display: flex;
+    align-items: center;
+    gap: 20px; /* links बीचको space, default 15-20px भन्दा बढी */
+}
+/* Round Logo */
+.logo-round{
+    width:100px;
+    height:100px;
+    border-radius:50%;
+    object-fit:cover;
 }
 
-/* Navbar */
-.navbar {
-    background-color: #ffffff !important;
-    position: sticky;
-    top: 0;
-    z-index: 999;
+/* Header info text */
+.header-info div,
+.header-info a{
+    font-size:14px;
+    font-weight:500;
+    color:#fff;
 }
-.navbar .nav-link {
-    color: #001f4d;
-    font-weight: 500;
-    position: relative;
-    transition: color 0.3s;
+
+/* Navbar links */
+.navbar .nav-link{
+    font-size:16px;
+    font-weight:600;
+    padding:12px 18px;  /* normal padding */
+    color:#fff !important;
+    transition: all 0.25s ease; /* smooth transition */
 }
-.navbar .nav-link:hover,
-.navbar .nav-link.active {
-    color: #ffdd57 !important;
+
+/* Subtle hover */
+.navbar .nav-link:hover{
+    background:#f4c430;   /* golden yellow highlight */
+    color:#001f4d !important;
+    padding:12px 18px;    /* keep padding same, no jump */
 }
-.navbar .nav-link::after {
-    content: '';
-    position: absolute;
-    width: 0%;
-    height: 2px;
-    bottom: 0;
-    left: 0;
-    background: #ffdd57;
-    transition: width 0.3s;
+
+/* Dropdown hover */
+.dropdown-item:hover{
+    background:#001f4d;
+    color:#f4c430;
+    padding:10px 18px;   /* slightly smaller vertical padding */
 }
-.navbar .nav-link:hover::after,
-.navbar .nav-link.active::after {
-    width: 100%;
+
+/* Dropdown smooth */
+.dropdown-menu{
+    display:block;
+    opacity:0;
+    visibility:hidden;
+    transform:translateY(12px); /* slightly below */
+    transition:all 0.3s ease;   /* smooth */
+    pointer-events:none;
+    border:none;
+    border-radius:0;
+    min-width:220px;
+    box-shadow:0 12px 30px rgba(0,0,0,0.12);
+    background:#fff;
+    padding:0;
 }
+
+/* Hover open */
+.nav-item.dropdown:hover > .dropdown-menu{
+    opacity:1;
+    visibility:visible;
+    transform:translateY(0);
+    pointer-events:auto;
+}
+
+/* Dropdown items */
+.dropdown-item{
+    font-size:15px;       /* slightly bigger */
+    font-weight:500;
+    padding:12px 18px;
+    color:#001f4d;
+    transition:all 0.25s ease;
+}
+
+/* Dropdown hover */
 
 /* Responsive */
 @media(max-width:768px){
-    .top-header { flex-direction: column; text-align: center; }
-    .top-header .info { margin-top: 10px; }
+    .container{
+        flex-direction:column;
+        align-items:center;
+        gap:10px;
+    }
+
+    .header-info{
+        text-align:center;
+        flex-direction:column;
+    }
+
+    .logo-round{
+        width:80px;
+        height:80px;
+    }
 }
 </style>

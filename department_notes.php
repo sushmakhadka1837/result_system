@@ -22,9 +22,10 @@ $batch_condition = ($batch=='old') ? "(sds.batch_year IS NULL OR sds.batch_year=
     </style>
 </head>
 <body>
+    
+<?php include 'header.php'; ?>
 <div class="container my-5">
-    <a href="engineering_notes.php" class="btn btn-secondary mb-3">&larr; Back to Departments</a>
-    <h3><?= $dept['department_name']; ?> Department</h3>
+    
 
     <div class="row mb-3">
         <div class="col-md-3">
@@ -84,5 +85,15 @@ if($sem_id){
 ?>
 </div>
 </div>
+ <button
+        onclick="history.back()"
+        class="w-10 h-10 flex items-center justify-center 
+               rounded-full bg-gray-200 hover:bg-gray-300 
+               text-gray-700 hover:text-gray-900 
+               shadow transition"
+        title="Go Back">
+        ←
+    </button>
+<?php include 'footer.php'; ?>
 </body>
 </html>

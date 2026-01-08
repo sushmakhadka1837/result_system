@@ -1,8 +1,8 @@
 <?php
 session_start();
 require 'db_config.php';
+require_once 'common.php'; 
 
-// Redirect if not logged in
 if (!isset($_SESSION['student_id']) || $_SESSION['user_type'] != 'student') {
     header("Location: index.php");
     exit();
@@ -16,208 +16,217 @@ $stmt->bind_param("i",$student_id);
 $stmt->execute();
 $student = $stmt->get_result()->fetch_assoc();
 
-// Fetch internal notices
-$stmt2 = $conn->prepare("SELECT n.*, t.full_name AS teacher_name FROM notices n JOIN teachers t ON n.teacher_id=t.id WHERE n.notice_type='internal' AND n.department_id=? AND (n.semester=? OR n.semester='all') ORDER BY n.created_at DESC LIMIT 5");
-$stmt2->bind_param("is",$student['department_id'],$student['semester']);
-$stmt2->execute();
-$internal_notices = $stmt2->get_result();
+// Auto-select current semester logic
+$filter_batch = $student['batch_year'];
+$filter_department = $student['department_id'];
+$current_semester_order = getCurrentSemester($filter_batch);
 
-// Fetch unread messages count
-$stmt3 = $conn->prepare("SELECT COUNT(*) AS unread_count FROM messages WHERE receiver_id=? AND is_read=0");
-$stmt3->bind_param("i",$student_id);
-$stmt3->execute();
-$unread_count = $stmt3->get_result()->fetch_assoc()['unread_count'];
+$stmt_sem = $conn->prepare("SELECT id FROM semesters WHERE department_id=? AND semester_order=?");
+$stmt_sem->bind_param("ii", $filter_department, $current_semester_order);
+$stmt_sem->execute();
+$result_sem = $stmt_sem->get_result();
+$filter_semester = ($row_sem = $result_sem->fetch_assoc()) ? $row_sem['id'] : 0;
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Student Dashboard</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-<style>
-body {
-    margin:0;
-    font-family:'Poppins', sans-serif;
-    background:#f4f6f8;
-}
-.navbar-custom {
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    background:#1a73e8;
-    color:white;
-    padding:12px 20px;
-    flex-wrap:wrap;
-}
-.navbar-custom a{
-    color:white;
-    text-decoration:none;
-    margin-left:15px;
-    font-weight:500;
-    position:relative;
-}
-.navbar-custom a span{
-    background:red;
-    color:white;
-    font-size:12px;
-    padding:2px 6px;
-    border-radius:50%;
-    position:absolute;
-    top:-8px;
-    right:-10px;
-}
-.container-dashboard{
-    display:flex;
-    flex-wrap:wrap;
-    gap:20px;
-    padding:20px;
-}
-.profile-card{
-    flex:1 1 280px;
-    background:white;
-    border-radius:15px;
-    padding:25px 20px;
-    text-align:center;
-    box-shadow:0 8px 20px rgba(0,0,0,0.08);
-    transition:transform 0.3s ease, box-shadow 0.3s ease;
-}
-.profile-card:hover{
-    transform:translateY(-5px);
-    box-shadow:0 12px 25px rgba(0,0,0,0.12);
-}
-.profile-card img{
-    width:120px;
-    height:120px;
-    border-radius:50%;
-    object-fit:cover;
-    cursor:pointer;
-    border:3px solid #1a73e8;
-}
-.profile-card h3{
-    margin:15px 0 5px 0;
-    color:#1a73e8;
-}
-.profile-card p{
-    margin:5px 0;
-    color:#555;
-    font-size:0.95rem;
-}
-.profile-card button{
-    margin-top:15px;
-    padding:10px 15px;
-    border:none;
-    background:#1a73e8;
-    color:white;
-    border-radius:8px;
-    cursor:pointer;
-    font-weight:500;
-}
-.profile-card button:hover{
-    background:#155ab6;
-}
-.card-section{
-    flex:2 1 600px;
-    background:white;
-    padding:25px 20px;
-    border-radius:15px;
-    box-shadow:0 8px 20px rgba(0,0,0,0.08);
-    margin-bottom:20px;
-}
-.card-section h2{
-    margin-top:0;
-    color:#1a73e8;
-    margin-bottom:20px;
-}
-.notice-card{
-    background:#f1f3f4;
-    padding:15px 20px;
-    border-radius:10px;
-    margin-bottom:12px;
-    transition:all 0.3s ease;
-}
-.notice-card:hover{
-    background:#e8f0fe;
-    transform:translateY(-3px);
-}
-.notice-card h4{
-    margin:0 0 5px 0;
-    color:#1a73e8;
-    font-weight:600;
-}
-.notice-card small{
-    color:#555;
-    font-size:0.85rem;
-}
-.view-all{
-    display:block;
-    text-align:right;
-    margin-top:10px;
-    font-weight:bold;
-    color:#1a73e8;
-    text-decoration:none;
-}
-@media(max-width:768px){
-    .container-dashboard{
-        flex-direction:column;
-    }
-}
-</style>
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | PEC Portal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --navy: #001f4d;
+            --navy-light: #003366;
+            --gold: #f4c430;
+            --bg-gray: #f8fafc; /* Clean background */
+            --border-color: #e2e8f0;
+        }
+
+        body { 
+            background-color: var(--bg-gray); 
+            font-family: 'Inter', 'Poppins', sans-serif; 
+            color: #1e293b; 
+        }
+        
+        .dashboard-container { padding: 30px 0 60px; }
+
+        /* Profile Card - White & Clean */
+        .profile-sidebar {
+            background: #ffffff;
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+            border: 1px solid var(--border-color);
+            position: sticky;
+            top: 100px;
+        }
+        .profile-header-accent {
+            background: #adb5bd;
+            height: 90px;
+        }
+        .profile-img-container {
+            margin-top: -55px;
+            text-align: center;
+        }
+        .profile-img-container img {
+            width: 115px;
+            height: 115px;
+            border-radius: 50%;
+            border: 6px solid white;
+            object-fit: cover;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        
+        .profile-body { padding: 20px 25px 30px; text-align: center; }
+        .profile-body h4 { font-weight: 700; color: var(--navy); margin-bottom: 4px; }
+        .dept-tag {
+            color: #64748b;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .info-list { text-align: left; margin-top: 25px; }
+        .sem-highlight {
+            background: #fff9e6;
+            border: 1px solid #fde68a;
+            border-radius: 12px;
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 0.9rem;
+            color: #475569;
+        }
+        .info-item i { color: var(--navy-light); width: 18px; text-align: center; }
+
+        /* Welcome Card - Dynamic Gradient */
+        .welcome-card {
+            background: linear-gradient(135deg, var(--navy) 0%, #004080 100%);
+            border-radius: 24px;
+            padding: 40px;
+            color: white;
+            margin-bottom: 30px;
+            position: relative;
+            overflow: hidden;
+        }
+        .welcome-card h2 { font-size: 1.8rem; margin-bottom: 10px; }
+
+        /* Content Sections */
+        .section-card {
+            background: white;
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+        }
+        .card-title-custom {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--navy);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .edit-btn {
+            background: #f1f5f9;
+            color: var(--navy);
+            border-radius: 12px;
+            width: 100%;
+            margin-top: 20px;
+            font-weight: 600;
+            border: none;
+            padding: 12px;
+            transition: 0.3s;
+        }
+        .edit-btn:hover { background: var(--navy); color: white; }
+    </style>
 </head>
 <body>
 
-<div class="navbar-custom">
-    <div><strong>Student Dashboard</strong></div>
-    <div>
-    <a href="index.php">Home</a>
+<?php include 'student_header.php'; ?>
+
+<div class="container dashboard-container">
+    <div class="row g-4">
         
-        <a href="student_view_result.php">View Result</a>
-        <a href="student_announcement.php">Announcements</a>
-        <a href="student_notes.php">Notes</a>
-        <a href="student_chat.php" id="nav-messages">Messages
-            <?php if($unread_count>0): ?>
-                <span id="unread-count"><?php echo ($unread_count>9)?'9+':$unread_count; ?></span>
-            <?php endif; ?>
-        </a>
-        <a href="logout.php">Logout</a>
+        <div class="col-lg-4">
+            <div class="profile-sidebar">
+                <div class="profile-header-accent"></div>
+                <div class="profile-img-container">
+                    <form action="upload_profile.php" method="post" enctype="multipart/form-data" id="profileForm">
+                        <label for="profile_photo" style="cursor: pointer;">
+                            <img src="<?php echo !empty($student['profile_photo']) ? $student['profile_photo'] : 'images/default.png'; ?>" alt="Student Photo">
+                        </label>
+                        <input type="file" name="profile_photo" id="profile_photo" style="display:none;" onchange="document.getElementById('profileForm').submit()">
+                    </form>
+                </div>
+                <div class="profile-body">
+                    <h4><?php echo htmlspecialchars($student['full_name']); ?></h4>
+                    <span class="dept-tag"><i class="fas fa-university me-1"></i> <?php echo htmlspecialchars($student['department_name']); ?></span>
+                    
+                    <div class="info-list">
+                        <div class="sem-highlight">
+                            <div class="icon-circle bg-white shadow-sm d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; border-radius: 10px;">
+                                <i class="fas fa-graduation-cap text-warning"></i>
+                            </div>
+                            <div>
+                                <small class="text-muted d-block" style="font-size: 0.7rem; text-transform: uppercase;">Active Status</small>
+                                <span class="fw-bold text-dark"><?php echo ($current_semester_order > 0) ? $current_semester_order . "th Semester" : "N/A"; ?></span>
+                            </div>
+                        </div>
+
+                        <div class="info-item">
+                            <i class="fas fa-envelope"></i>
+                            <span><?php echo htmlspecialchars($student['email']); ?></span>
+                        </div>
+                        <div class="info-item">
+                            <i class="fas fa-phone"></i>
+                            <span><?php echo htmlspecialchars($student['phone']); ?></span>
+                        </div>
+                        <div class="info-item">
+                            <i class="fas fa-calendar-check"></i>
+                            <span>Batch Year: <?php echo htmlspecialchars($student['batch_year']); ?></span>
+                        </div>
+                    </div>
+                    
+                    <button class="edit-btn" onclick="window.location.href='student_edit_profile.php'">
+                        <i class="fas fa-fingerprint me-2"></i> Update Profile
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            
+
+            <div class="mb-4">
+               
+            </div>
+
+            <div class="section-card">
+                <h4 class="card-title-custom">
+                    <i class="fas fa-bullhorn text-warning"></i> Recent Announcements
+                </h4>
+                <hr class="text-muted opacity-25">
+                <?php include 'view_student_notice.php'; ?>
+            </div>
+        </div>
+
     </div>
 </div>
 
-<div class="container-dashboard">
-    <!-- Profile Card -->
-    <div class="profile-card">
-        <form action="upload_profile.php" method="post" enctype="multipart/form-data">
-            <label for="profile_photo">
-                <img src="<?php echo !empty($student['profile_photo'])?$student['profile_photo']:'default.png'; ?>" alt="Profile Photo">
-            </label>
-            <input type="file" name="profile_photo" id="profile_photo" style="display:none;" onchange="this.form.submit()">
-        </form>
-        <h3><?php echo htmlspecialchars($student['full_name']); ?></h3>
-        <p><strong>Email:</strong> <?php echo htmlspecialchars($student['email']); ?></p>
-        <p><strong>Phone:</strong> <?php echo htmlspecialchars($student['phone']); ?></p>
-        <p><strong>Department:</strong> <?php echo htmlspecialchars($student['department_name']); ?></p>
-        <p><strong>Batch:</strong> <?php echo htmlspecialchars($student['batch_year']); ?></p>
-        <button onclick="window.location.href='student_edit_profile.php'">Edit Profile</button>
-    </div>
-
-    <!-- Internal Announcements -->
-    <?php include 'view_student_notice.php'; ?>
-</div>
 <?php include 'footer.php'; ?>
-<script>
-function updateUnreadCount(){
-    $.get('fetch_unread_count.php', function(data){
-        if(data>0){
-            $('#unread-count').remove();
-            $('#nav-messages').append('<span id="unread-count">'+(data>9?'9+':data)+'</span>');
-        } else {
-            $('#unread-count').remove();
-        }
-    });
-}
-setInterval(updateUnreadCount,3000);
-</script>
 
 </body>
 </html>

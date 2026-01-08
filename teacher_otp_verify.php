@@ -39,7 +39,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
         $_SESSION['teacher_id'] = $teacher['id'];
         $_SESSION['teacher_name'] = $teacher['full_name'];
 
-        header("Location: teacher_dashboard.php");
+        header("Location: teacher_login.php");
         exit;
     }
 }
