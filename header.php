@@ -77,7 +77,7 @@
 .navbar-nav {
     display: flex;
     align-items: center;
-    gap: 20px; /* links बीचको space, default 15-20px भन्दा बढी */
+  gap: 50px;
 }
 /* Round Logo */
 .logo-round{

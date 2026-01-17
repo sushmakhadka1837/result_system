@@ -203,7 +203,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
             
             <div class="text-center mt-4">
                 <span class="text-muted small">Already registered?</span> 
-                <a href="login.php" class="text-decoration-none fw-bold small ms-1" style="color: #2a5298;">Login Here</a>
+                <a href="student_login.php" class="text-decoration-none fw-bold small ms-1" style="color: #2a5298;">Login Here</a>
             </div>
         </form>
     </div>

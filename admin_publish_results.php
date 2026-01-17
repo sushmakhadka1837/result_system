@@ -1,101 +1,139 @@
 <?php
 session_start();
-require 'db_config.php';
+require_once 'db_config.php';
+require_once 'mail_config.php';
 
-// Admin check
-if(!isset($_SESSION['admin_id'])){
-    header("Location: admin_login.php");
-    exit();
-}
+$exam_type = $_GET['exam_type'] ?? 'ut'; // Default UT
+$error_message = '';
 
-// Result type to check
-$result_type = $_GET['type'] ?? 'ut'; // default UT, or ?type=assessment
-
-// Fetch all departments
-$departments = $conn->query("SELECT * FROM departments ORDER BY department_name ASC");
-
-// Check if "Publish All Departments" clicked
-if(isset($_POST['publish_all'])){
-    $dept_res = $conn->query("SELECT * FROM departments");
-    while($d = $dept_res->fetch_assoc()){
-        $sem_res = $conn->query("SELECT id FROM semesters WHERE department_id=".$d['id']);
-        while($s = $sem_res->fetch_assoc()){
-            $conn->query("
-                INSERT INTO results_publish_status (department_id, semester_id, result_type, published, published_at)
-                VALUES (".$d['id'].", ".$s['id'].", '$result_type', 1, NOW())
-                ON DUPLICATE KEY UPDATE published=1, published_at=NOW()
-            ");
+// Handle form submission
+if(isset($_POST['btn_publish'])){
+    $dept_id = intval($_POST['department']);
+    $batch = intval($_POST['batch']);
+    
+    // Validate department and batch exist
+    $check = $conn->query("SELECT COUNT(*) as count FROM students WHERE department_id=$dept_id AND batch_year=$batch");
+    $result = $check->fetch_assoc();
+    
+    if($result['count'] > 0){
+        // Get all student emails for this department and batch
+        $students = $conn->query("SELECT email, full_name FROM students WHERE department_id=$dept_id AND batch_year=$batch");
+        
+        // Send email notification to all students
+        $email_count = 0;
+        while($student = $students->fetch_assoc()){
+            $to_email = $student['email'];
+            $to_name = $student['full_name'];
+            $subject = "Results Published";
+            
+            // Email body
+            $body = "Hello $to_name,<br><br>";
+            $body .= "Your <b>results have been published</b>!<br>";
+            $body .= "Please log in to the Result Management System to view your results.<br><br>";
+            $body .= "Thank you!<br>";
+            $body .= "Pokhara Engineering College";
+            
+            // Send email using PHPMailer
+            try {
+                $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+                $mail->isSMTP();
+                $mail->Host       = 'smtp.gmail.com';
+                $mail->SMTPAuth   = true;
+                $mail->Username   = 'aahanakhadka6@gmail.com';
+                $mail->Password   = 'upxa vjdc wdck ccjw';
+                $mail->SMTPSecure = 'tls';
+                $mail->Port       = 587;
+                
+                $mail->setFrom('aahanakhadka6@gmail.com', 'Hamro Result');
+                $mail->addAddress($to_email, $to_name);
+                $mail->isHTML(true);
+                $mail->Subject = $subject;
+                $mail->Body    = $body;
+                
+                if($mail->send()){
+                    $email_count++;
+                }
+            } catch (Exception $e) {
+                error_log('Email failed for ' . $to_email . ': ' . $e->getMessage());
+            }
         }
+        
+        // Redirect to results page
+        header("Location: admin_view_results.php?dept_id=$dept_id&batch=$batch&emails_sent=$email_count");
+        exit;
+    } else {
+        $error_message = "Invalid department or batch! No students found.";
     }
-    $success = "✅ All departments and semesters published successfully for ".strtoupper($result_type)."!";
 }
 ?>
 
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<title>Publish Student Results - Admin</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <meta charset="UTF-8">
+    <title>Publish Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-light">
-<div class="container mt-4">
-<h3>📢 Publish Student Results (<?= strtoupper($result_type) ?>)</h3>
-<hr>
+<body class="bg-slate-50 p-10">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-black mb-8">PUBLISH CONTROL PANEL</h1>
 
-<?php if(isset($success)) echo "<div class='alert alert-success'>$success</div>"; ?>
+        <?php if($error_message): ?>
+            <div class="bg-red-100 border-l-4 border-red-600 text-red-700 p-4 mb-6 rounded-lg font-semibold">
+                ❌ <?= htmlspecialchars($error_message) ?>
+            </div>
+        <?php endif; ?>
 
-<form method="post">
-<button type="submit" name="publish_all" class="btn btn-danger mb-3">
-    🚀 Publish All Departments
-</button>
-</form>
+        <div class="bg-white p-6 rounded-2xl shadow-sm mb-8 flex items-center justify-between border-l-8 border-indigo-600">
+            <div>
+                <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Select Exam Type to Manage</label>
+                <select onchange="location.href='?exam_type=' + this.value" class="p-3 border rounded-xl font-bold text-indigo-700 outline-none focus:ring-2 focus:ring-indigo-400">
+                    <option value="ut" <?= $exam_type == 'ut' ? 'selected' : '' ?>>Unit Test (UT)</option>
+                    <option value="assessment" <?= $exam_type == 'assessment' ? 'selected' : '' ?>>Internal Assessment</option>
+                </select>
+            </div>
+            
+            <a href="admin_<?= $exam_type ?>_manager.php" class="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-indigo-700 transition-all">
+                Go to <?= strtoupper($exam_type) ?> Manager →
+            </a>
+        </div>
 
-<table class="table table-bordered bg-white">
-<thead>
-<tr>
-<th>Department</th>
-<th>Status</th>
-<th>Action</th>
-</tr>
-</thead>
-<tbody>
-<?php while($dept = $departments->fetch_assoc()): ?>
-<tr>
-<td><?= htmlspecialchars($dept['department_name']) ?></td>
+        <?php if($exam_type == 'ut'): ?>
+            <div class="bg-white p-8 rounded-2xl shadow-sm border-t-4 border-slate-800">
+                <h2 class="text-lg font-bold mb-4">Publish Unit Test Results</h2>
+                <form method="POST" class="grid grid-cols-3 gap-4 italic">
+                    <input type="hidden" name="type" value="ut">
+                    <select name="department" class="border p-3 rounded-lg font-bold" required>
+                        <option value="">Select Department</option>
+                        <?php $depts = $conn->query("SELECT * FROM departments ORDER BY department_name ASC");
+                        while($d = $depts->fetch_assoc()): ?>
+                            <option value="<?= $d['id'] ?>"><?= $d['department_name'] ?></option>
+                        <?php endwhile; ?>
+                    </select>
+                    <input type="number" name="batch" placeholder="Batch (e.g. 2022)" class="border p-3 rounded-lg" required>
+                    <button type="submit" name="btn_publish" class="bg-slate-800 text-white rounded-lg font-bold hover:bg-slate-900">Apply Status</button>
+                </form>
+            </div>
+        <?php endif; ?>
 
-<?php
-$dept_id = $dept['id'];
+        <?php if($exam_type == 'assessment'): ?>
+            <div class="bg-white p-8 rounded-2xl shadow-sm border-t-4 border-orange-500">
+                <h2 class="text-lg font-bold mb-4 text-orange-600">Publish Internal Assessment</h2>
+                <form method="POST" class="grid grid-cols-3 gap-4 italic">
+                    <input type="hidden" name="type" value="assessment">
+                    <select name="department" class="border p-3 rounded-lg font-bold" required>
+                        <option value="">Select Department</option>
+                        <?php $depts = $conn->query("SELECT * FROM departments ORDER BY department_name ASC");
+                        while($d = $depts->fetch_assoc()): ?>
+                            <option value="<?= $d['id'] ?>"><?= $d['department_name'] ?></option>
+                        <?php endwhile; ?>
+                    </select>
+                    <input type="number" name="batch" placeholder="Batch" class="border p-3 rounded-lg" required>
+                    <button type="submit" name="btn_publish" class="bg-orange-600 text-white rounded-lg font-bold hover:bg-orange-700">Apply Status</button>
+                </form>
+            </div>
+        <?php endif; ?>
 
-// Total semesters in this department
-$total_sem = $conn->query("SELECT COUNT(*) as total FROM semesters WHERE department_id=$dept_id")->fetch_assoc()['total'];
-
-// Published semesters for this result type
-$pub_sem = $conn->query("
-    SELECT COUNT(*) as pub FROM results_publish_status
-    WHERE department_id=$dept_id AND result_type='$result_type' AND published=1
-")->fetch_assoc()['pub'];
-
-// Determine status badge
-if($pub_sem == 0){
-    $status_badge = "<span class='badge bg-warning'>Pending</span>";
-} elseif($pub_sem < $total_sem){
-    $status_badge = "<span class='badge bg-info'>Partially Published</span>";
-} else {
-    $status_badge = "<span class='badge bg-success'>Published</span>";
-}
-
-echo "<td>$status_badge</td>";
-?>
-
-<td>
-<a href="publish_department.php?dept_id=<?= $dept['id'] ?>&type=<?= $result_type ?>" class="btn btn-primary btn-sm">
-    View Semesters
-</a>
-</td>
-</tr>
-<?php endwhile; ?>
-</tbody>
-</table>
-</div>
+    </div>
 </body>
 </html>

@@ -114,12 +114,18 @@ if(isset($_POST['show'])){
     $section = !empty($_POST['section']) ? $_POST['section'] : null;
     $syllabus = ($batch <= 2022) ? 'Old' : 'New';
 
-    // Fetch subjects for department+semester
+    // Filter subjects by batch/syllabus: batch > 2022 = syllabus_flag 1, else 0 or NULL
+    $syllabus_condition = ($batch > 2022) ? "sds.syllabus_flag = 1" : "(sds.syllabus_flag = 0 OR sds.syllabus_flag IS NULL)";
+
+    // Fetch subjects for department+semester+batch
     $subs = $conn->query("
         SELECT sds.subject_id, sm.subject_name, sm.subject_code, sm.credit_hours, sm.is_elective
         FROM subjects_department_semester sds
         JOIN subjects_master sm ON sm.id = sds.subject_id
-        WHERE sds.department_id=$dept AND sds.semester=$sem
+        WHERE sds.department_id=$dept 
+          AND sds.semester=$sem
+          AND sds.batch_year=$batch
+          AND $syllabus_condition
     ");
 
     if($subs && $subs->num_rows>0){
@@ -128,7 +134,8 @@ if(isset($_POST['show'])){
               <input type='hidden' name='semester' value='$sem'>
               <input type='hidden' name='batch_year' value='$batch'>
               <input type='hidden' name='section' value='".($section ?? '')."'>
-              <h5 class='mb-3'>Available Subjects for Assignment</h5>
+              <input type='hidden' name='teacher_id' value='$teacher_id'>
+              <h5 class='mb-3'>Available Subjects for Assignment (Batch $batch - $syllabus Syllabus)</h5>
               <table class='table table-bordered table-striped'>
                 <thead>
                   <tr>
@@ -144,9 +151,9 @@ if(isset($_POST['show'])){
         $i=1;
         while($s = $subs->fetch_assoc()){
             $subject_id = $s['subject_id'];
-            // Check if subject already assigned
+            // Check if subject already assigned to ANY teacher
             $check_sql = "
-                SELECT * FROM teacher_subjects
+                SELECT teacher_id FROM teacher_subjects
                 WHERE subject_map_id=$subject_id
                 AND department_id=$dept
                 AND semester_id=$sem
@@ -158,7 +165,11 @@ if(isset($_POST['show'])){
                 $check_sql .= " AND section='$section'";
             }
             $check = $conn->query($check_sql);
-            $assigned = ($check && $check->num_rows>0);
+            $assigned_to = null;
+            if($check && $check->num_rows > 0) {
+                $assigned_row = $check->fetch_assoc();
+                $assigned_to = $assigned_row['teacher_id'];
+            }
 
             $code = !empty($s['subject_code']) ? $s['subject_code'] : '-';
             $type = $s['is_elective'] ? 'Elective' : 'Regular';
@@ -170,8 +181,12 @@ if(isset($_POST['show'])){
                     <td>{$s['credit_hours']}</td>
                     <td>{$type}</td>
                     <td class='text-center'>";
-            if($assigned){
-                echo "<span class='badge bg-success'>Assigned</span>";
+            if($assigned_to !== null){
+                if($assigned_to == $teacher_id){
+                    echo "<span class='badge bg-danger' style='color: red; font-weight: bold;'>Your Subject</span>";
+                } else {
+                    echo "<span class='badge bg-danger' style='color: red; font-weight: bold;'>Assigned to Another Teacher</span>";
+                }
             } else {
                 echo "<input type='checkbox' name='subject_map_id[]' value='$subject_id'>";
             }
@@ -182,7 +197,7 @@ if(isset($_POST['show'])){
               <button type='submit' name='assign' class='btn btn-primary mt-3 w-100'>Assign Selected Subjects</button>
               </form>";
     } else {
-        echo "<div class='alert alert-warning'>No subjects found for this department/semester.</div>";
+        echo "<div class='alert alert-warning'>No subjects found for Batch $batch in this department/semester.</div>";
     }
 }
 

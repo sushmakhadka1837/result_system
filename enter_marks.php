@@ -25,6 +25,26 @@ $students = $conn->query("
 <head>
 <title>Enter Marks</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+<style>
+    /* Mobile Responsive */
+    @media (max-width: 768px) {
+        .card { padding: 1rem !important; }
+        h4, h5 { font-size: 1.1rem; }
+        .row .col-md-3 { width: 100%; margin-bottom: 0.5rem; }
+        .table-responsive { overflow-x: auto; }
+        .table { font-size: 0.85rem; }
+        th, td { padding: 0.5rem !important; }
+    }
+    
+    @media (max-width: 576px) {
+        body { padding: 0.5rem !important; }
+        h4 { font-size: 1rem; }
+        h5 { font-size: 0.9rem; }
+        .table { font-size: 0.75rem; min-width: 800px; }
+        th, td { padding: 0.3rem !important; }
+        input.form-control { font-size: 0.85rem; padding: 0.375rem; }
+    }
+</style>
 </head>
 <body class="p-3">
 
@@ -62,6 +82,7 @@ $students = $conn->query("
 </div>
 
 <!-- ✅ MARKS TABLE -->
+<div class="table-responsive">
 <table class="table table-bordered">
 <thead class="table-dark">
 <tr>
@@ -106,6 +127,7 @@ $students = $conn->query("
 
 </tbody>
 </table>
+</div>
 
 <button class="btn btn-primary mt-3">✅ Save Marks</button>
 </form>

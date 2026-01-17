@@ -22,8 +22,6 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
     $full_name = $_POST['full_name'] ?? '';
     $email = $_POST['email'] ?? '';
     $phone = $_POST['phone'] ?? '';
-    $department = $_POST['department'] ?? '';
-    $batch_year = $_POST['batch_year'] ?? '';
 
     // Optional profile photo upload
     $profile_photo = $student['profile_photo']; // default existing
@@ -36,9 +34,9 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
         }
     }
 
-    // Update database
-    $stmt = $conn->prepare("UPDATE students SET full_name=?, email=?, phone=?, department=?, batch_year=?, profile_photo=? WHERE id=?");
-    $stmt->bind_param("ssssssi", $full_name, $email, $phone, $department, $batch_year, $profile_photo, $student_id);
+    // Update database (department and batch_year are not editable)
+    $stmt = $conn->prepare("UPDATE students SET full_name=?, email=?, phone=?, profile_photo=? WHERE id=?");
+    $stmt->bind_param("ssssi", $full_name, $email, $phone, $profile_photo, $student_id);
     if($stmt->execute()){
         header("Location: student_dashboard.php?success=1");
         exit();
@@ -83,10 +81,10 @@ img { width:100px; height:100px; border-radius:50%; object-fit:cover; margin-bot
         <input type="text" name="phone" value="<?php echo htmlspecialchars($student['phone'] ?? ''); ?>">
 
         <label>Department</label>
-        <input type="text" name="department" value="<?php echo htmlspecialchars($student['department'] ?? ''); ?>">
+        <input type="text" name="department" value="<?php echo htmlspecialchars($student['department'] ?? ''); ?>" readonly style="background-color:#e9ecef; cursor:not-allowed;">
 
         <label>Batch Year</label>
-        <input type="text" name="batch_year" value="<?php echo htmlspecialchars($student['batch_year'] ?? ''); ?>">
+        <input type="text" name="batch_year" value="<?php echo htmlspecialchars($student['batch_year'] ?? ''); ?>" readonly style="background-color:#e9ecef; cursor:not-allowed;">
 
         <button type="submit">Update Profile</button>
     </form>

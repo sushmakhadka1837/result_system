@@ -4,7 +4,6 @@ require 'db_config.php';
 require 'otp_mailer.php'; 
 
 $error = '';
-$success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $full_name = trim($_POST['full_name']);
@@ -13,33 +12,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = trim($_POST['password']);
     $employee_id = trim($_POST['employee_id']);
 
-    if (!$full_name || !$email || !$password || !$employee_id) {
-        $error = "All fields are required.";
-    } else {
-        $stmt = $conn->prepare("SELECT * FROM teachers WHERE email=? OR employee_id=?");
-        $stmt->bind_param("ss", $email, $employee_id);
-        $stmt->execute();
-        $existing = $stmt->get_result()->fetch_assoc();
+    // 1. Check if Employee ID exists and is not assigned
+    $stmt = $conn->prepare("SELECT assigned FROM valid_employee_ids WHERE employee_id = ?");
+    $stmt->bind_param("s", $employee_id);
+    $stmt->execute();
+    $id_res = $stmt->get_result();
+    $id_data = $id_res->fetch_assoc();
 
-        if ($existing) {
-            $error = "Email or Employee ID already registered.";
+    if (!$id_data) {
+        $error = "Invalid Employee ID! Tapai ko ID system ma bhetiyena.";
+    } elseif ($id_data['assigned'] == 1) {
+        $error = "Yo Employee ID pahile nai register bhai sakeko chha.";
+    } else {
+        // 2. Check if Email already registered in teachers table
+        $stmt = $conn->prepare("SELECT id FROM teachers WHERE email = ?");
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+        if ($stmt->get_result()->num_rows > 0) {
+            $error = "Yo Email bata pahile nai account bani sakeko chha.";
         } else {
+            // 3. Sabai thik chha bhane OTP pathaune ra Temporary Save garne
             $hashed = password_hash($password, PASSWORD_DEFAULT);
             $otp = rand(100000, 999999);
             $expiry = date("Y-m-d H:i:s", strtotime("+10 minutes"));
 
-            $stmt = $conn->prepare("INSERT INTO teachers 
-                (full_name,email,password,contact,employee_id,otp,otp_expiry) 
-                VALUES (?,?,?,?,?,?,?)");
+            $stmt = $conn->prepare("INSERT INTO teachers (full_name, email, password, contact, employee_id, otp, otp_expiry, is_verified) VALUES (?, ?, ?, ?, ?, ?, ?, 0)");
             $stmt->bind_param("sssssss", $full_name, $email, $hashed, $contact, $employee_id, $otp, $expiry);
 
             if ($stmt->execute()) {
-                $_SESSION['pending_teacher_id'] = $conn->insert_id;
+                $_SESSION['pending_email'] = $email;
+                $_SESSION['pending_emp_id'] = $employee_id; // OTP verify pachi assigned=1 garna
                 sendOTP($email, $full_name, $otp, 'teacher');
                 header("Location: teacher_otp_verify.php");
                 exit;
             } else {
-                $error = "Registration failed. Try again.";
+                $error = "Kahi galti bhayo. Pheri prayas garnuhos.";
             }
         }
     }

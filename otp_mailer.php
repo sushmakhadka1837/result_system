@@ -16,7 +16,7 @@ function sendOTP($to_email, $to_name, $otp) {
         $mail->SMTPSecure = 'tls';
         $mail->Port       = 587;
 
-        $mail->setFrom('aahanakhadka6@gmail.com', 'PEC-RESULT');
+        $mail->setFrom('aahanakhadka6@gmail.com', 'Hamro Result');
         $mail->addAddress($to_email, $to_name);
 
         $mail->isHTML(true);

@@ -31,7 +31,7 @@ require 'db_config.php';
   </style>
 </head>
 <body>
-<?php include 'student_header.php'; ?>
+<?php include 'header.php'; ?>
 <div class="container my-5">
     <h1 class="mb-3 text-center">📘 Engineering Notes</h1>
     <p class="text-center mb-5">Find notes, syllabus & past questions for all departments of Pokhara Engineering College.</p>

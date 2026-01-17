@@ -72,8 +72,16 @@ body{font-family:Arial;margin:0;background:#f4f6f8;}
 .student-message{background:#007bff;color:#fff;align-self:flex-end;border-bottom-right-radius:0;}
 .teacher-message{background:#e9ecef;color:#000;align-self:flex-start;border-bottom-left-radius:0;}
 .time{font-size:10px;opacity:0.6;margin-top:2px;text-align:right;}
-textarea{width:100%;height:45px;padding:6px;border-radius:5px;border:1px solid #ccc;resize:none;}
-button{background:#28a745;color:#fff;border:none;padding:6px 12px;border-radius:5px;cursor:pointer;float:right;margin-top:4px;}
+.attachment{margin-top:8px;display:inline-block;}
+.attachment img{max-width:200px;border-radius:8px;cursor:pointer;}
+.attachment a{color:#007bff;text-decoration:none;padding:5px 10px;background:#f0f0f0;border-radius:5px;display:inline-block;}
+.file-preview{font-size:0.75rem;color:#555;margin-top:5px;background:#f9f9f9;padding:5px;border-radius:3px;}
+.input-wrapper{display:flex;gap:8px;align-items:flex-end;}
+textarea{flex:1;height:45px;padding:6px;border-radius:5px;border:1px solid #ccc;resize:none;}
+.file-input-wrapper{position:relative;}
+.file-input-wrapper input[type="file"]{display:none;}
+.file-btn{background:#6c757d;color:#fff;border:none;padding:6px 12px;border-radius:5px;cursor:pointer;}
+button{background:#28a745;color:#fff;border:none;padding:6px 12px;border-radius:5px;cursor:pointer;}
 </style>
 </head>
 <body>
@@ -100,10 +108,17 @@ button{background:#28a745;color:#fff;border:none;padding:6px 12px;border-radius:
 <?php if($selected_teacher_id): ?>
 <strong>Chat with <?=htmlspecialchars($teacher_name)?></strong>
 <div class="chat-box" id="chat-box"></div>
-<form id="chat-form" method="post">
+<div class="file-preview" id="file-preview" style="display:none;"></div>
+<form id="chat-form" method="post" enctype="multipart/form-data">
 <input type="hidden" name="receiver_id" value="<?=$selected_teacher_id?>">
-<textarea name="message" required placeholder="Type message..."></textarea>
+<div class="input-wrapper">
+<textarea name="message" placeholder="Type message..."></textarea>
+<div class="file-input-wrapper">
+<input type="file" id="file-input" name="attachment" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar">
+<button type="button" class="file-btn" onclick="document.getElementById('file-input').click();">📎</button>
+</div>
 <button type="submit">Send</button>
+</div>
 </form>
 <?php else: ?>
 <p>Select a teacher to start chat</p>
@@ -123,7 +138,23 @@ function fetchMessages(){
         let html = '';
         data.messages.forEach(m=>{
             let cls = (m.sender_type=='student')?'student-message':'teacher-message';
-            html += `<div class='message ${cls}'>${m.message}<div class='time'>${m.created_at}</div></div>`;
+            html += `<div class='message ${cls}'>`;
+            if(m.message) html += m.message;
+            
+            // Display attachment
+            if(m.attachment){
+                let ext = m.attachment.split('.').pop().toLowerCase();
+                let fileName = m.attachment.split('/').pop();
+                html += `<div class='attachment'>`;
+                if(['jpg','jpeg','png','gif'].includes(ext)){
+                    html += `<a href='${m.attachment}' target='_blank'><img src='${m.attachment}' alt='Image'></a>`;
+                }else{
+                    html += `<a href='${m.attachment}' download='${fileName}'>📎 ${fileName}</a>`;
+                }
+                html += `</div>`;
+            }
+            
+            html += `<div class='time'>${m.created_at}</div></div>`;
         });
         $('#chat-box').html(html);
         $('#chat-box').scrollTop($('#chat-box')[0].scrollHeight);
@@ -142,11 +173,33 @@ function fetchMessages(){
     });
 }
 
+// File preview
+$('#file-input').change(function(){
+    let file = this.files[0];
+    if(file){
+        let fileName = file.name;
+        let fileSize = (file.size/1024).toFixed(2);
+        $('#file-preview').html('📎 '+fileName+' ('+fileSize+' KB)').show();
+    }else{
+        $('#file-preview').hide();
+    }
+});
+
 $('#chat-form').submit(function(e){
     e.preventDefault();
-    $.post('send_message.php',$(this).serialize(),function(res){
-        $('textarea[name="message"]').val('');
-        fetchMessages();
+    let formData = new FormData(this);
+    $.ajax({
+        url: 'send_message.php',
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function(res){
+            $('textarea[name="message"]').val('');
+            $('#file-input').val('');
+            $('#file-preview').hide();
+            fetchMessages();
+        }
     });
 });
 

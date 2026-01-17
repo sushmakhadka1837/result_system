@@ -151,6 +151,44 @@ $filter_semester = ($row_sem = $result_sem->fetch_assoc()) ? $row_sem['id'] : 0;
             transition: 0.3s;
         }
         .edit-btn:hover { background: var(--navy); color: white; }
+
+        /* Mobile Responsive */
+        @media (max-width: 992px) {
+            .profile-sidebar {
+                position: relative;
+                top: 0;
+                margin-bottom: 20px;
+            }
+            .dashboard-container { padding: 15px 0 30px; }
+            .welcome-card { padding: 25px; }
+            .welcome-card h2 { font-size: 1.4rem; }
+            .section-card { padding: 20px; }
+        }
+
+        @media (max-width: 768px) {
+            .profile-header-accent { height: 70px; }
+            .profile-img-container { margin-top: -40px; }
+            .profile-img-container img { width: 85px; height: 85px; border-width: 4px; }
+            .profile-body { padding: 15px 20px 25px; }
+            .profile-body h4 { font-size: 1.1rem; }
+            .dept-tag { font-size: 0.8rem; }
+            .info-item { font-size: 0.85rem; padding: 10px 0; }
+            .sem-highlight { padding: 10px; gap: 10px; }
+            .welcome-card { padding: 20px; margin-bottom: 20px; }
+            .welcome-card h2 { font-size: 1.2rem; }
+            .section-card { padding: 15px; }
+            .card-title-custom { font-size: 1rem; margin-bottom: 15px; }
+        }
+
+        @media (max-width: 576px) {
+            .dashboard-container { padding: 10px 0 20px; }
+            .profile-img-container img { width: 75px; height: 75px; }
+            .profile-body h4 { font-size: 1rem; }
+            .info-item { flex-direction: column; align-items: flex-start; gap: 5px; font-size: 0.8rem; }
+            .info-item i { margin-bottom: 5px; }
+            .welcome-card { padding: 15px; }
+            .welcome-card h2 { font-size: 1rem; }
+        }
     </style>
 </head>
 <body>

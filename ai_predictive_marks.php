@@ -5,7 +5,35 @@ $student_id = $_SESSION['student_id'];
 $sem_id = intval($_GET['sem_id'] ?? 8); 
 $ut_total = 50; $assessment_total = 100;
 
-$query = "SELECT r.subject_id, sm.subject_name, sm.is_elective, r.ut_obtain
+// Get UT-to-Assessment correlation from PREVIOUS semester only (more accurate)
+$prev_query = "SELECT sm.id as subject_id,
+              AVG(r.ut_obtain) as avg_ut_marks,
+              AVG(r.assessment_raw) as avg_assess_marks,
+              AVG((r.assessment_raw / r.ut_obtain)) as ut_to_assess_ratio
+              FROM results r 
+              JOIN subjects_master sm ON r.subject_id = sm.id
+              WHERE r.student_id = ? AND r.semester_id = ? - 1
+              AND r.ut_obtain > 0 AND r.assessment_raw > 0
+              AND sm.subject_name NOT REGEXP '^(Project I|Project II|Project)$'
+              GROUP BY sm.id";
+              
+$prev_stmt = $conn->prepare($prev_query);
+$prev_stmt->bind_param("ii", $student_id, $sem_id);
+$prev_stmt->execute();
+$prev_results = $prev_stmt->get_result();
+
+// Store UT-to-Assessment correlation
+$ut_assess_correlation = array();
+while($prev = $prev_results->fetch_assoc()){
+    $ut_assess_correlation[$prev['subject_id']] = array(
+        'avg_ut' => $prev['avg_ut_marks'],
+        'avg_assess' => $prev['avg_assess_marks'],
+        'ratio' => $prev['ut_to_assess_ratio']
+    );
+}
+
+// Current semester data with assessment
+$query = "SELECT r.subject_id, sm.subject_name, sm.is_elective, r.ut_obtain, r.assessment_raw
           FROM results r JOIN subjects_master sm ON r.subject_id = sm.id
           LEFT JOIN student_electives se ON (sm.id = se.elective_option_id AND se.student_id = r.student_id AND se.semester_id = r.semester_id)
           WHERE r.student_id = ? AND r.semester_id = ?
@@ -19,114 +47,75 @@ $results_q->execute();
 $results_data = $results_q->get_result();
 ?>
 
-<div class="ai-wide-footer-section mt-5 no-print">
-    <div class="container">
-        <div class="ai-main-card">
-            <div class="ai-card-header-mini">
-                <div class="pulse-red me-2"></div>
-                <span class="fw-bold" style="font-size: 0.8rem; color: #1e293b;">AI ASSESSOR: SEMESTER <?= $sem_id ?> PREDICTIONS</span>
-            </div>
-
+<div class="container mt-5 no-print">
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">🤖 AI Assessment Predictor - Semester <?= $sem_id ?></h5>
+        </div>
+        <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-borderless mb-0 align-middle">
-                    <thead>
-                        <tr class="text-muted" style="font-size: 0.65rem; letter-spacing: 1px;">
-                            <th class="ps-4">COURSE TITLE</th>
-                            <th class="text-center">UNIT TEST</th>
-                            <th class="text-center">PROJECTED FINAL</th>
-                            <th class="pe-4">AI ANALYSIS</th>
+                <table class="table table-sm table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Subject</th>
+                            <th class="text-center">UT Marks<br><small class="text-muted fw-normal">(Unit Test /50)</small></th>
+                            <th class="text-center">Predicted Assessment<br><small class="text-muted fw-normal">(AI forecast based on your UT - Work Hard! /100)</small></th>
+                            <th class="text-center">Expected Grade</th>
+                            <th class="text-center">Message</th>
                         </tr>
                     </thead>
                     <tbody>
-                    <?php while($res = $results_data->fetch_assoc()):
-                        $ut = floatval($res['ut_obtain']);
-                        $pred = round(($ut / $ut_total) * $assessment_total);
-                        $c = ($pred >= 80) ? "#10b981" : (($pred >= 60) ? "#3b82f6" : "#ef4444");
-                    ?>
-                        <tr class="interactive-row">
-                            <td class="ps-4">
-                                <div class="sub-label-mini <?= $res['is_elective'] ? 'bg-warning-subtle text-warning' : 'bg-primary-subtle text-primary' ?>">
+                        <?php while($res = $results_data->fetch_assoc()):
+                            $current_ut = $res['ut_obtain'];
+                            $current_assess = $res['assessment_raw'];
+                            
+                            // Predict Assessment marks
+                            if (isset($ut_assess_correlation[$res['subject_id']])) {
+                                $corr = $ut_assess_correlation[$res['subject_id']];
+                                $predicted_assess = round($current_ut * $corr['ratio']);
+                                $predicted_assess = min($predicted_assess, 100);
+                            } else {
+                                $predicted_assess = min(round($current_ut * 2), 100);
+                            }
+                            
+                            // Calculate grade
+                            $mark = ($current_assess > 0) ? $current_assess : $predicted_assess;
+                            if ($mark >= 90) { $grade = 'A+'; $badge = 'success'; }
+                            elseif ($mark >= 80) { $grade = 'A'; $badge = 'success'; }
+                            elseif ($mark >= 70) { $grade = 'B+'; $badge = 'info'; }
+                            elseif ($mark >= 60) { $grade = 'B'; $badge = 'info'; }
+                            elseif ($mark >= 50) { $grade = 'C+'; $badge = 'warning'; }
+                            elseif ($mark >= 40) { $grade = 'C'; $badge = 'warning'; }
+                            else { $grade = 'D'; $badge = 'danger'; }
+                            
+                            $is_prediction = ($current_assess == 0);
+                        ?>
+                        <tr>
+                            <td>
+                                <small class="badge badge-sm <?= $res['is_elective'] ? 'bg-warning' : 'bg-secondary' ?>">
                                     <?= $res['is_elective'] ? 'Elective' : 'Core' ?>
-                                </div>
-                                <div class="subject-title-bold"><?= htmlspecialchars($res['subject_name']) ?></div>
+                                </small>
+                                <span class="ms-1"><?= htmlspecialchars($res['subject_name']) ?></span>
+                            </td>
+                            <td class="text-center"><strong><?= $current_ut ?></strong>/50</td>
+                            <td class="text-center"><strong class="text-primary"><?= $predicted_assess ?></strong>/100</td>
+                            <td class="text-center">
+                                <span class="badge bg-<?= $badge ?>"><?= $grade ?></span>
                             </td>
                             <td class="text-center">
-                                <span class="ut-badge-compact"><?= $ut ?></span>
-                            </td>
-                            <td class="text-center">
-                                <div class="prediction-value" style="color: <?= $c ?>;"><?= $pred ?>%</div>
-                                <div class="progress-bar-mini"><div class="fill" style="width:<?= $pred ?>%; background:<?= $c ?>;"></div></div>
-                            </td>
-                            <td class="pe-4">
-                                <div class="analysis-bubble" style="border-left: 3px solid <?= $c ?>;">
-                                    <?= ($pred >= 80) ? "Excellent momentum!" : (($pred >= 60) ? "Good work, aim for 80+" : "Needs focused revision") ?>
-                                </div>
+                                <?php if($predicted_assess >= 80): ?>
+                                    <small class="text-success">🎯 Keep it up!</small>
+                                <?php elseif($predicted_assess >= 60): ?>
+                                    <small class="text-info">💪 Good, push harder!</small>
+                                <?php else: ?>
+                                    <small class="text-warning">⚠️ Work harder!</small>
+                                <?php endif; ?>
                             </td>
                         </tr>
-                    <?php endwhile; ?>
+                        <?php endwhile; ?>
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
 </div>
-
-<style>
-/* Wide Section Layout */
-.ai-wide-footer-section { width: 100%; background: #fcfdfe; padding: 40px 0; border-top: 1px solid #edf2f7; }
-
-.ai-main-card { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; }
-
-/* 🚀 INTERACTIVE HOVER LOGIC */
-.interactive-row { 
-    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); 
-    cursor: pointer;
-    border-bottom: 1px solid #f8fafc;
-}
-
-/* Row Hover huda halka pop-out hune ra shake hune */
-.interactive-row:hover {
-    background-color: #f8fbff;
-    transform: translateX(8px); /* Halka debre bata dahine dhakeline */
-    box-shadow: inset 4px 0 0 #3b82f6; /* Side blue border */
-}
-
-/* Row hover huda text lai color dine */
-.interactive-row:hover .subject-title-bold { color: #3b82f6; }
-
-.subject-title-bold { font-weight: 700; color: #334155; font-size: 0.85rem; transition: 0.2s; }
-.sub-label-mini { font-size: 0.55rem; font-weight: 800; text-transform: uppercase; padding: 1px 6px; border-radius: 3px; display: inline-block; margin-bottom: 2px; }
-
-.ut-badge-compact { background: #f1f5f9; padding: 3px 8px; border-radius: 6px; font-weight: 700; font-size: 0.8rem; color: #475569; }
-.prediction-value { font-size: 1rem; font-weight: 900; line-height: 1; margin-bottom: 4px; }
-
-.progress-bar-mini { width: 60px; height: 3px; background: #e2e8f0; border-radius: 10px; margin: 0 auto; overflow: hidden; }
-.fill { height: 100%; transition: width 1s ease-in-out; }
-
-.analysis-bubble { 
-    background: #f8fafc; padding: 6px 12px; border-radius: 8px; font-size: 0.75rem; color: #64748b; 
-    transition: all 0.3s ease;
-}
-
-/* Hover garda bubble shake hune logic */
-.interactive-row:hover .analysis-bubble {
-    background: #fff;
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
-    transform: scale(1.05);
-}
-
-.ai-card-header-mini { padding: 12px 20px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; }
-
-/* Pulse animation for AI icon */
-.pulse-red {
-  width: 8px; height: 8px; background: #3b82f6; border-radius: 50%;
-  box-shadow: 0 0 0 rgba(59, 130, 246, 0.4);
-  animation: pulse-blue 2s infinite;
-}
-
-@keyframes pulse-blue {
-  0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
-  70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
-}
-</style>

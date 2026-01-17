@@ -7,7 +7,7 @@ require 'db_config.php';
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Notice Board - PEC Result Hub</title>
+<title>Notice Board - Hamro Result</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">

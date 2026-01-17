@@ -45,6 +45,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         .section-label { font-weight: bold; color: #555; text-transform: uppercase; font-size: 0.85rem; display: block; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
         .ut-section { background-color: #f0f7ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 5px solid #007bff; }
         .assessment-section { background-color: #f9fff9; padding: 15px; border-radius: 8px; border-left: 5px solid #28a745; }
+        
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .form-container { margin: 20px 10px; padding: 20px; }
+            .row .col-md-6 { width: 100%; }
+        }
+        
+        @media (max-width: 576px) {
+            .form-container { margin: 10px 5px; padding: 15px; border-radius: 10px; }
+            h4 { font-size: 1.2rem; }
+            .section-label { font-size: 0.75rem; }
+            .ut-section, .assessment-section { padding: 12px; }
+        }
     </style>
 </head>
 <body class="bg-light">

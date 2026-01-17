@@ -6,6 +6,22 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
+    <?php
+    // Fetch unread messages count for the logged-in teacher
+    if(isset($_SESSION['teacher_id'])) {
+        $teacher_id = $_SESSION['teacher_id'];
+        $unread_query = "SELECT COUNT(*) as unread_count FROM messages WHERE receiver_id = ? AND sender_type = 'student' AND is_read = 0";
+        $stmt = $conn->prepare($unread_query);
+        $stmt->bind_param("i", $teacher_id);
+        $stmt->execute();
+        $unread_result = $stmt->get_result();
+        $unread_data = $unread_result->fetch_assoc();
+        $unread_count = $unread_data['unread_count'] ?? 0;
+    } else {
+        $unread_count = 0;
+    }
+    ?>
+    
     <style>
         :root {
             --navy-blue: #0a192f;        /* Deep Navy Blue */
@@ -149,11 +165,64 @@
             background: rgba(255,255,255,0.1);
             margin: 0 15px;
         }
+
+        /* Dropdown Menu */
+        .nav-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .dropdown-menu {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: var(--navy-light);
+            border-radius: 8px;
+            min-width: 200px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+            z-index: 1001;
+            margin-top: 5px;
+        }
+
+        .nav-dropdown:hover .dropdown-menu {
+            display: block;
+        }
+
+        .dropdown-menu a {
+            color: var(--text-silver);
+            padding: 12px 20px;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .dropdown-menu a:first-child {
+            border-radius: 8px 8px 0 0;
+        }
+
+        .dropdown-menu a:last-child {
+            border-radius: 0 0 8px 8px;
+        }
+
+        .dropdown-menu a:hover {
+            background: var(--navy-blue);
+            color: var(--accent-cyan);
+            border-left-color: var(--accent-cyan);
+            padding-left: 24px;
+        }
+
+        .dropdown-menu i {
+            color: var(--accent-cyan);
+            font-size: 1rem;
+        }
     </style>
 </head>
 <body>
-
-<?php $unread_count = $unread_count ?? 0; ?>
 
 <header class="teacher-navbar">
     <div class="nav-left">
@@ -165,15 +234,25 @@
     </div>
 
     <nav class="nav-center">
-        <a href="teacher_dashboard.php" class="nav-link">
+        <a href="index.php" class="nav-link">
             <i class="fas fa-home"></i> Home
         </a>
         <a href="teacher_subjects.php" class="nav-link">
             <i class="fas fa-book-open"></i> Subjects
         </a>
-        <a href="teacher_notes.php" class="nav-link">
-            <i class="fas fa-file-signature"></i> Notes
-        </a>
+        <div class="nav-dropdown">
+            <a href="teacher_notes.php" class="nav-link">
+                <i class="fas fa-file-signature"></i> Notes
+            </a>
+            <div class="dropdown-menu">
+                <a href="teacher_notes.php">
+                    <i class="fas fa-upload"></i> Upload Notes
+                </a>
+                <a href="teacher_verify_student_uploads.php">
+                    <i class="fas fa-check-circle"></i> Verify Student Uploads
+                </a>
+            </div>
+        </div>
         <a href="publish_result.php" class="nav-link">
             <i class="fas fa-poll"></i> Results
         </a>

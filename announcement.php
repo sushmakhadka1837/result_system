@@ -25,7 +25,11 @@ if(isset($_POST['send_notice'])){
         $img_dir = "uploads/notice_images/";
         if(!is_dir($img_dir)) mkdir($img_dir,0777,true);
 
+        // Limit to max 5 images
+        $max_images = 5;
+        $count = 0;
         foreach($_FILES['notice_images']['tmp_name'] as $k => $tmp){
+            if($count >= $max_images) break;
             if(empty($tmp)) continue;
             $ext = strtolower(pathinfo($_FILES['notice_images']['name'][$k], PATHINFO_EXTENSION));
             if(!in_array($ext,['jpg','jpeg','png','webp'])) continue;
@@ -34,6 +38,7 @@ if(isset($_POST['send_notice'])){
             $path = $img_dir.$newName;
             if(move_uploaded_file($tmp,$path)){
                 $image_paths[] = $path;
+                $count++;
             }
         }
     }
@@ -154,6 +159,36 @@ document.getElementById('notice_department').addEventListener('change', function
         });
     });
 });
+
+// Image preview and validation
+document.getElementById('notice_images').addEventListener('change', function(e){
+    let files = e.target.files;
+    let preview = document.getElementById('image_preview');
+    preview.innerHTML = '';
+    
+    if(files.length > 5){
+        alert('⚠️ Maximum 5 images allowed!');
+        this.value = '';
+        return;
+    }
+    
+    for(let i = 0; i < files.length; i++){
+        if(files[i].type.match('image.*')){
+            let reader = new FileReader();
+            reader.onload = function(ev){
+                let img = document.createElement('img');
+                img.src = ev.target.result;
+                img.style.width = '80px';
+                img.style.height = '80px';
+                img.style.objectFit = 'cover';
+                img.style.borderRadius = '8px';
+                img.style.border = '2px solid #1a73e8';
+                preview.appendChild(img);
+            };
+            reader.readAsDataURL(files[i]);
+        }
+    }
+});
 </script>
 
 
@@ -164,8 +199,9 @@ document.getElementById('notice_department').addEventListener('change', function
             <option value="exam">Exam</option>
             <option value="general">General</option>
         </select>
-        <label class="fw-bold">📸 Upload Photos (Max 10)</label>
-        <input type="file" name="notice_images[]" multiple accept="image/*" class="form-control mb-2">
+        <label class="fw-bold">📸 Upload Photos (Max 5)</label>
+        <input type="file" name="notice_images[]" id="notice_images" multiple accept="image/*" class="form-control mb-2">
+        <div id="image_preview" style="display:flex; gap:10px; flex-wrap:wrap; margin:10px 0;"></div>
         <button type="submit" name="send_notice" class="btn btn-primary w-100">📢 Publish Notice</button>
     </form>
     <a href="manage_announcements.php" class="btn btn-outline-primary mt-2">View Announcements</a>

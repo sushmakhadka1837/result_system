@@ -1,6 +1,7 @@
 <?php
 session_start();
 require 'db_config.php';
+require 'notification_helper.php';
 
 /* ---------------- AUTH CHECK ---------------- */
 if(!isset($_SESSION['student_id'])){
@@ -36,36 +37,76 @@ $uploadMsg = "";
 if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_file'])){
     $title = htmlspecialchars($_POST['title']);
     $file  = $_FILES['file_upload'];
+    $declaration_agreed = isset($_POST['declaration_agreed']) && $_POST['declaration_agreed'] === 'on';
     
-    $allowed = ['pdf','doc','docx','zip'];
-    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-
-    if(!in_array($ext, $allowed)){
-        $uploadMsg = "<div class='alert alert-danger py-2 small'>PDF, DOC, ZIP matra support hunchha!</div>";
+    // Check if student has agreed to declaration
+    if(!$declaration_agreed){
+        $uploadMsg = "<div class='alert alert-danger py-2 small'><i class='fa fa-exclamation-circle'></i> You must agree to the declaration to upload!</div>";
     } else {
-        $dir = "uploads/notes/"; 
-        if(!is_dir($dir)) mkdir($dir, 0777, true);
+        $allowed = ['pdf','doc','docx','pptx','zip'];
+        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
 
-        $newName = time() . "_" . preg_replace("/[^a-zA-Z0-9.]/", "_", $file['name']);
-        $path = $dir . $newName;
+        if(!in_array($ext, $allowed)){
+            $uploadMsg = "<div class='alert alert-danger py-2 small'><i class='fa fa-times-circle me-1'></i><strong>Invalid File Type!</strong> केवल PDF, DOC, DOCX, PPTX, ZIP files मात्र upload गर्न सकिन्छ।</div>";
+        } else {
+            $dir = "uploads/notes/"; 
+            if(!is_dir($dir)) mkdir($dir, 0777, true);
 
-        if(move_uploaded_file($file['tmp_name'], $path)){
-            // $category lai note_type ma save garne logic
-            $stmt = $conn->prepare("INSERT INTO notes (department_id, semester_id, subject_id, note_type, title, file_path, uploader_id, uploader_role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'student', NOW())");
-            
-            $stmt->bind_param("iiisssi", 
-                $subject['department_id'], 
-                $subject['semester_id'], 
-                $subject_id, 
-                $category, 
-                $title, 
-                $path, 
-                $student_id
-            );
+            $newName = time() . "_" . preg_replace("/[^a-zA-Z0-9.]/", "_", $file['name']);
+            $path = $dir . $newName;
 
-            if($stmt->execute()){
-                header("Location: student_upload_pdf.php?subject_id=$subject_id&category=$category&success=1");
-                exit();
+            if(move_uploaded_file($file['tmp_name'], $path)){
+                // Insert notes with pending approval status
+                $approval_status = 'pending';
+                $stmt = $conn->prepare("INSERT INTO notes (department_id, semester_id, subject_id, note_type, title, file_path, uploader_id, uploader_role, approval_status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'student', ?, NOW())");
+                
+                $stmt->bind_param("iiisssss", 
+                    $subject['department_id'], 
+                    $subject['semester_id'], 
+                    $subject_id, 
+                    $category, 
+                    $title, 
+                    $path, 
+                    $student_id,
+                    $approval_status
+                );
+
+                if($stmt->execute()){
+                    $upload_id = $stmt->insert_id;
+                    
+                    // Save declaration record
+                    $declaration_text = "I declare that this is my original and authentic study material. I understand that providing false or plagiarized content may result in penalties.";
+                    $ip_address = $_SERVER['REMOTE_ADDR'];
+                    
+                    $decl_stmt = $conn->prepare("INSERT INTO student_upload_declarations (upload_id, student_id, declaration_text, ip_address) VALUES (?, ?, ?, ?)");
+                    $decl_stmt->bind_param("iiss", $upload_id, $student_id, $declaration_text, $ip_address);
+                    $decl_stmt->execute();
+                    
+                    // Get teachers assigned to this subject and notify them
+                    $teachers_query = "SELECT DISTINCT t.id FROM teachers t 
+                                      JOIN teacher_subjects ts ON t.id = ts.teacher_id 
+                                      WHERE ts.subject_map_id = ?";
+                    $teachers_stmt = $conn->prepare($teachers_query);
+                    $teachers_stmt->bind_param("i", $subject_id);
+                    $teachers_stmt->execute();
+                    $teachers_result = $teachers_stmt->get_result();
+                    
+                    // Notify each teacher
+                    while($teacher = $teachers_result->fetch_assoc()){
+                        // Count pending uploads for this teacher's subject
+                        $count_query = "SELECT COUNT(*) as cnt FROM notes n 
+                                       WHERE n.subject_id = ? AND n.approval_status = 'pending'";
+                        $count_stmt = $conn->prepare($count_query);
+                        $count_stmt->bind_param("i", $subject_id);
+                        $count_stmt->execute();
+                        $count_data = $count_stmt->get_result()->fetch_assoc();
+                        
+                        notifyTeacherPendingUploads($teacher['id'], $count_data['cnt'], $subject['subject_name'], $conn);
+                    }
+                    
+                    header("Location: student_upload_pdf.php?subject_id=$subject_id&category=$category&success=1");
+                    exit();
+                }
             }
         }
     }
@@ -130,17 +171,37 @@ if(isset($_GET['delete'])){
             <div class="upload-card p-4 sticky-top" style="top: 100px;">
                 <h5 class="fw-bold mb-3">Add <?= $catTitle ?></h5>
                 <?= $uploadMsg ?>
-                <?php if(isset($_GET['success'])) echo "<div class='alert alert-success py-2 small'>Saved to $catTitle!</div>"; ?>
+                <?php if(isset($_GET['success'])) echo "<div class='alert alert-success py-2 small'><i class='fa fa-check-circle me-1'></i>Upload Successful! अब teacher verification को लागि pending छ।</div>"; ?>
+                <?php if(isset($_GET['deleted'])) echo "<div class='alert alert-info py-2 small'><i class='fa fa-trash me-1'></i>Upload deleted successfully.</div>"; ?>
 
                 <form method="POST" enctype="multipart/form-data">
                     <div class="mb-3">
-                        <label class="small fw-bold text-muted">Title</label>
-                        <input type="text" name="title" class="form-control" required>
+                        <label class="small fw-bold text-muted">Title / शीर्षक</label>
+                        <input type="text" name="title" class="form-control" placeholder="e.g., Chapter 1-3 Notes, Unit Test Syllabus" required>
+                        <small class="text-muted">Brief description of your upload</small>
                     </div>
                     <div class="mb-3">
-                        <label class="small fw-bold text-muted">File</label>
-                        <input type="file" name="file_upload" class="form-control" required>
+                        <label class="small fw-bold text-muted">File / फाइल</label>
+                        <input type="file" name="file_upload" class="form-control" accept=".pdf,.doc,.docx,.pptx,.zip" required>
+                        <small class="text-muted"><i class="fa fa-info-circle me-1"></i>Accepted: PDF, DOC, DOCX, PPTX, ZIP (Max 10MB)</small>
                     </div>
+                    
+                    <!-- Self Declaration Section -->
+                    <div class="mb-3 p-3 bg-light rounded-3 border-start border-4 border-warning">
+                        <h6 class="mb-2 fw-bold text-dark">
+                            <i class="fa fa-exclamation-triangle text-warning me-2"></i>Self Declaration
+                        </h6>
+                        <p class="small text-muted mb-2" style="line-height: 1.5;">
+                            I confirm that this is my original and authentic study material. I understand that providing false or plagiarized content may result in academic penalties, marks deduction, or other disciplinary action.
+                        </p>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="declaration_agreed" name="declaration_agreed" required>
+                            <label class="form-check-label small" for="declaration_agreed">
+                                I agree to the above declaration
+                            </label>
+                        </div>
+                    </div>
+                    
                     <button type="submit" name="upload_file" class="btn w-100 fw-bold text-white" style="background: var(--navy);">
                         Upload to <?= $catTitle ?>
                     </button>
@@ -161,17 +222,40 @@ if(isset($_GET['delete'])){
             if($files->num_rows > 0): 
                 while($f = $files->fetch_assoc()):
                     $fext = pathinfo($f['file_path'], PATHINFO_EXTENSION);
+                    
+                    // Determine approval badge
+                    $approval_badge = '';
+                    $approval_color = '';
+                    if($f['approval_status'] == 'approved'){
+                        $approval_badge = '<span class="badge bg-success ms-1"><i class="fa fa-check-circle me-1"></i>Approved</span>';
+                        $approval_color = 'border-success';
+                    } else if($f['approval_status'] == 'rejected'){
+                        $approval_badge = '<span class="badge bg-danger ms-1"><i class="fa fa-times-circle me-1"></i>Rejected</span>';
+                        $approval_color = 'border-danger';
+                    } else if($f['approval_status'] == 'plagiarized'){
+                        $approval_badge = '<span class="badge bg-danger ms-1"><i class="fa fa-ban me-1"></i>Flagged</span>';
+                        $approval_color = 'border-danger';
+                    } else {
+                        $approval_badge = '<span class="badge bg-warning text-dark ms-1"><i class="fa fa-hourglass-half me-1"></i>Pending Approval</span>';
+                        $approval_color = 'border-warning';
+                    }
             ?>
-                <div class="file-card d-flex align-items-center justify-content-between">
-                    <div class="d-flex align-items-center">
+                <div class="file-card d-flex align-items-center justify-content-between <?= $approval_color ?>">
+                    <div class="d-flex align-items-center flex-grow-1">
                         <div class="me-3 fs-3 text-secondary">
                             <i class="fa fa-file-<?= ($fext=='pdf')?'pdf':'alt' ?>"></i>
                         </div>
-                        <div>
-                            <h6 class="mb-1 fw-bold"><?= htmlspecialchars($f['title']) ?></h6>
+                        <div class="flex-grow-1">
+                            <h6 class="mb-1 fw-bold">
+                                <?= htmlspecialchars($f['title']) ?>
+                                <?= $approval_badge ?>
+                            </h6>
                             <small class="text-muted">
                                 <span class="badge bg-light text-dark border me-1"><?= strtoupper($fext) ?></span>
                                 <?= date('M d, Y', strtotime($f['created_at'])) ?>
+                                <?php if($f['approval_status'] == 'approved'): ?>
+                                    <i class="fa fa-check text-success ms-1"></i> Approved <?= date('M d', strtotime($f['approved_at'])) ?>
+                                <?php endif; ?>
                             </small>
                         </div>
                     </div>
@@ -179,9 +263,9 @@ if(isset($_GET['delete'])){
                         <a href="<?= $f['file_path'] ?>" target="_blank" class="btn btn-sm btn-light border"><i class="fa fa-eye"></i></a>
                         <a href="<?= $f['file_path'] ?>" download class="btn btn-sm btn-outline-primary"><i class="fa fa-download"></i></a>
                         
-                        <?php if($f['uploader_id'] == $student_id): ?>
+                        <?php if($f['uploader_id'] == $student_id && $f['approval_status'] == 'pending'): ?>
                             <a href="?subject_id=<?= $subject_id ?>&category=<?= $category ?>&delete=<?= $f['id'] ?>" 
-                               onclick="return confirm('Delete?')" class="btn btn-sm btn-outline-danger"><i class="fa fa-trash"></i></a>
+                               onclick="return confirm('Delete this pending upload?')" class="btn btn-sm btn-outline-danger"><i class="fa fa-trash"></i></a>
                         <?php endif; ?>
                     </div>
                 </div>

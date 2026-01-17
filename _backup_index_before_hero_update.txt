@@ -1,0 +1,1 @@
+Backup note: We will replace the hero CSS block (stray styles with no selector) and update hero HTML structure to match Gemini design. This is a marker file only.

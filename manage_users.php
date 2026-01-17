@@ -1,6 +1,7 @@
 <?php
 session_start();
 require 'db_config.php';
+require_once 'functions.php';
 
 // Check admin login
 if (!isset($_SESSION['admin_logged_in'])) {
@@ -40,163 +41,233 @@ function h($val) {
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Manage Users</title>
-<script src="https://cdn.tailwindcss.com"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Users | RMS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .tab-active { border-bottom: 3px solid #4f46e5; color: #4f46e5; font-weight: 700; }
+        .sidebar-link:hover { background: rgba(255,255,255,0.05); }
+    </style>
 </head>
-<body class="bg-gray-100 font-sans">
+<body class="bg-slate-50 text-slate-800">
 
-<div class="container mx-auto p-6">
-<h2 class="text-3xl font-semibold text-indigo-700 mb-6">Manage Users</h2>
+<div class="flex min-h-screen">
+    <aside class="w-72 bg-slate-900 text-slate-300 hidden lg:flex flex-col fixed h-full z-50">
+        <div class="p-6 border-b border-slate-800 flex items-center gap-3">
+            <div class="h-9 w-9 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
+                <i class="fa-solid fa-users-gear text-lg"></i>
+            </div>
+            <span class="text-xl font-bold text-white tracking-tight">Admin Portal</span>
+        </div>
+        <nav class="p-4 space-y-1 mt-4">
+            <a href="admin_dashboard.php" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-slate-400">
+                <i class="fa-solid fa-chart-pie w-5"></i> Dashboard
+            </a>
+            <a href="manage_users.php" class="flex items-center gap-3 px-4 py-3 rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/20">
+                <i class="fa-solid fa-user-group w-5"></i> Manage Users
+            </a>
+            <a href="manage_departments.php" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-slate-400">
+                <i class="fa-solid fa-sitemap w-5"></i> Departments
+            </a>
+            <a href="manage_feedback.php" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-slate-400">
+                <i class="fa-solid fa-comments w-5"></i> Feedback
+            </a>
+        </nav>
+    </aside>
 
-<!-- Tabs -->
-<div class="mb-6 flex space-x-4">
-    <button id="tabStudents" class="px-4 py-2 bg-indigo-600 text-white rounded">Students</button>
-    <button id="tabTeachers" class="px-4 py-2 bg-gray-300 text-gray-800 rounded">Teachers</button>
+    <main class="flex-1 lg:ml-72 p-6 lg:p-10">
+        <div class="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+            <div>
+                <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">User Management</h1>
+                <p class="text-slate-500 mt-1">Students ra Teachers haruko database yaha bata manage garnu hos.</p>
+            </div>
+            <div class="flex gap-3">
+                <a href="student_signup.php" class="bg-white text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl font-bold hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm">
+                    <i class="fa-solid fa-user-plus text-indigo-500 text-sm"></i> Add Student
+                </a>
+                <a href="teacher_signup.php" class="bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-lg shadow-indigo-200">
+                    <i class="fa-solid fa-plus text-sm"></i> Add Teacher
+                </a>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="flex border-b border-slate-100 px-8">
+                <button id="btnStudents" class="px-6 py-5 text-sm font-semibold transition-all tab-active flex items-center gap-2">
+                    <i class="fa-solid fa-user-graduate"></i> Students List
+                </button>
+                <button id="btnTeachers" class="px-6 py-5 text-sm font-semibold transition-all text-slate-400 hover:text-slate-600 flex items-center gap-2">
+                    <i class="fa-solid fa-chalkboard-user"></i> Teachers List
+                </button>
+            </div>
+
+            <div id="studentSection" class="p-8">
+                <form method="get" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 bg-slate-50 p-5 rounded-2xl border border-slate-100">
+                    <div>
+                        <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1 ml-1">Department</label>
+                        <select name="department" class="w-full bg-white border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all">
+                            <option value="">All Departments</option>
+                            <?php while($d = $departments_result->fetch_assoc()): ?>
+                                <option value="<?= $d['id'] ?>" <?= ($dept==$d['id']?'selected':'') ?>><?= h($d['department_name']) ?></option>
+                            <?php endwhile; ?>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1 ml-1">Semester</label>
+                        <select name="semester" class="w-full bg-white border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all">
+                            <option value="">All Semesters</option>
+                            <?php for($i=1;$i<=10;$i++): ?>
+                                <option value="<?= $i ?>" <?= ($sem==$i?'selected':'') ?>><?= $i ?></option>
+                            <?php endfor; ?>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1 ml-1">Batch Year</label>
+                        <input type="number" name="batch_year" placeholder="e.g. 2024" value="<?= $batch ?: '' ?>" 
+                               class="w-full bg-white border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all">
+                    </div>
+                    <div class="flex items-end">
+                        <button type="submit" class="w-full bg-slate-800 text-white p-2.5 rounded-xl font-bold hover:bg-slate-900 transition-all flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-filter text-xs"></i> Apply Filters
+                        </button>
+                    </div>
+                </form>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-100 text-slate-400">
+                                <th class="px-4 py-4 text-xs font-bold uppercase tracking-wider text-center">ID</th>
+                                <th class="px-4 py-4 text-xs font-bold uppercase tracking-wider">Student Profile</th>
+                                <th class="px-4 py-4 text-xs font-bold uppercase tracking-wider">Academic Details</th>
+                                <th class="px-4 py-4 text-xs font-bold uppercase tracking-wider text-center">Batch/Sec</th>
+                                <th class="px-4 py-4 text-xs font-bold uppercase tracking-wider text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-50">
+                            <?php $i=1; while($student = $students_result->fetch_assoc()): ?>
+                            <tr class="hover:bg-slate-50/50 transition-colors group">
+                                <td class="px-4 py-5 text-center text-sm font-bold text-slate-300">#<?= $i++; ?></td>
+                                <td class="px-4 py-5">
+                                    <div class="flex items-center gap-3">
+                                        <div class="h-10 w-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-sm">
+                                            <?= substr($student['full_name'],0,1) ?>
+                                        </div>
+                                        <div>
+                                            <p class="font-bold text-slate-900 leading-tight"><?= h($student['full_name']); ?></p>
+                                            <p class="text-xs text-slate-400"><?= h($student['email']); ?></p>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-5">
+                                    <div class="flex flex-col">
+                                        <span class="text-sm font-semibold text-slate-700"><?= h($student['department_name'] ?: '-'); ?></span>
+                                        <span class="text-[10px] text-indigo-500 font-black uppercase">Semester <?= h($student['semester']); ?></span>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-5 text-center">
+                                    <span class="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[11px] font-bold">
+                                        <?= h($student['batch_year']); ?> (<?= h($student['section']); ?>)
+                                    </span>
+                                </td>
+                                <td class="px-4 py-5 text-center">
+                                    <div class="flex justify-center gap-2">
+                                        <a href="edit_student.php?id=<?= $student['id'] ?>" class="h-8 w-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all">
+                                            <i class="fa-solid fa-pen-to-square text-xs"></i>
+                                        </a>
+                                        <a href="delete_student.php?id=<?= $student['id'] ?>" onclick="return confirm('Delete?')" class="h-8 w-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center hover:bg-rose-600 hover:text-white transition-all">
+                                            <i class="fa-solid fa-trash-can text-xs"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            <?php endwhile; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="teacherSection" class="hidden p-8">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-100 text-slate-400">
+                                <th class="px-4 py-4 text-xs font-bold uppercase tracking-wider text-center">#</th>
+                                <th class="px-4 py-4 text-xs font-bold uppercase tracking-wider">Teacher Profile</th>
+                                <th class="px-4 py-4 text-xs font-bold uppercase tracking-wider">Emp ID</th>
+                                <th class="px-4 py-4 text-xs font-bold uppercase tracking-wider">Contact</th>
+                                <th class="px-4 py-4 text-xs font-bold uppercase tracking-wider text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-50">
+                            <?php $i=1; while($teacher = $teachers_result->fetch_assoc()): ?>
+                            <tr class="hover:bg-slate-50/50 transition-colors group">
+                                <td class="px-4 py-5 text-center text-sm font-bold text-slate-300"><?= $i++; ?></td>
+                                <td class="px-4 py-5">
+                                    <div class="flex items-center gap-3">
+                                        <div class="h-10 w-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 font-bold text-sm">
+                                            <i class="fa-solid fa-user-tie"></i>
+                                        </div>
+                                        <div>
+                                            <p class="font-bold text-slate-900 leading-tight"><?= h($teacher['full_name']); ?></p>
+                                            <p class="text-xs text-slate-400"><?= h($teacher['email']); ?></p>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-5 font-mono text-sm text-slate-500 font-bold">
+                                    <?= h($teacher['employee_id']); ?>
+                                </td>
+                                <td class="px-4 py-5 text-sm text-slate-600">
+                                    <i class="fa-solid fa-phone text-xs mr-1 opacity-40"></i> <?= h($teacher['contact']); ?>
+                                </td>
+                                <td class="px-4 py-5 text-center">
+                                    <div class="flex justify-center gap-2">
+                                        <a href="edit_teacher.php?id=<?= $teacher['id'] ?>" class="h-8 w-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all">
+                                            <i class="fa-solid fa-pen-to-square text-xs"></i>
+                                        </a>
+                                        <a href="delete_teacher.php?id=<?= $teacher['id'] ?>" onclick="return confirm('Delete?')" class="h-8 w-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center hover:bg-rose-600 hover:text-white transition-all">
+                                            <i class="fa-solid fa-trash-can text-xs"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            <?php endwhile; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
 </div>
-
-<!-- Students Filter Form -->
-<div id="studentsTable">
-<form method="get" class="mb-4 flex gap-2">
-    <select name="department" class="border p-2 rounded">
-        <option value="">All Departments</option>
-        <?php while($d = $departments_result->fetch_assoc()): ?>
-            <option value="<?= $d['id'] ?>" <?= ($dept==$d['id']?'selected':'') ?>><?= h($d['department_name']) ?></option>
-        <?php endwhile; ?>
-    </select>
-    <select name="semester" class="border p-2 rounded">
-        <option value="">All Semesters</option>
-        <?php for($i=1;$i<=10;$i++): ?>
-            <option value="<?= $i ?>" <?= ($sem==$i?'selected':'') ?>><?= $i ?></option>
-        <?php endfor; ?>
-    </select>
-    <input type="number" name="batch_year" placeholder="Batch Year" value="<?= $batch ?: '' ?>" class="border p-2 rounded">
-    <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded">Filter</button>
-</form>
-
-<table class="w-full border-collapse bg-white rounded-lg overflow-hidden shadow">
-<thead class="bg-indigo-100">
-<tr>
-    <th class="p-3 border">#</th>
-    <th class="p-3 border text-left">Name</th>
-    <th class="p-3 border text-left">Email</th>
-    <th class="p-3 border text-center">Department</th>
-    <th class="p-3 border text-center">Semester</th>
-    <th class="p-3 border text-center">Batch Year</th>
-    <th class="p-3 border text-center">Section</th>
-    <th class="p-3 border text-center">Action</th>
-</tr>
-</thead>
-<tbody>
-<?php $i=1; while($student = $students_result->fetch_assoc()): ?>
-<tr class="hover:bg-gray-50">
-    <td class="p-2 border text-center"><?= $i++; ?></td>
-    <td class="p-2 border"><?= h($student['full_name']); ?></td>
-    <td class="p-2 border"><?= h($student['email']); ?></td>
-    <td class="p-2 border text-center"><?= h($student['department_name'] ?: '-'); ?></td>
-    <td class="p-2 border text-center"><?= h($student['semester'] ?: '-'); ?></td>
-    <td class="p-2 border text-center"><?= h($student['batch_year'] ?: '-'); ?></td>
-    <td class="p-2 border text-center"><?= h($student['section'] ?: '-'); ?></td>
-    <td class="p-2 border text-center">
-        <a href="edit_student.php?id=<?= $student['id'] ?>" class="text-blue-600 hover:underline mr-2">Edit</a>
-        <a href="delete_student.php?id=<?= $student['id'] ?>" onclick="return confirm('Delete this student?')" class="text-red-600 hover:underline">Delete</a>
-    </td>
-</tr>
-<?php endwhile; ?>
-</tbody>
-</table>
-</div>
-
-<!-- Teachers Table -->
-<div id="teachersTable" class="hidden">
-<table class="w-full border-collapse bg-white rounded-lg overflow-hidden shadow">
-<thead class="bg-indigo-100">
-<tr>
-    <th class="p-3 border">#</th>
-    <th class="p-3 border text-left">Name</th>
-    <th class="p-3 border text-left">Email</th>
-    <th class="p-3 border text-left">Employee ID</th>
-    <th class="p-3 border text-left">Contact</th>
-    <th class="p-3 border text-center">Action</th>
-</tr>
-</thead>
-<tbody>
-<?php $i=1; while($teacher = $teachers_result->fetch_assoc()): ?>
-<tr class="hover:bg-gray-50">
-    <td class="p-2 border text-center"><?= $i++; ?></td>
-    <td class="p-2 border"><?= h($teacher['full_name']); ?></td>
-    <td class="p-2 border"><?= h($teacher['email']); ?></td>
-    <td class="p-2 border"><?= h($teacher['employee_id']); ?></td>
-    <td class="p-2 border"><?= h($teacher['contact']); ?></td>
-    <td class="p-2 border text-center">
-        <a href="edit_teacher.php?id=<?= $teacher['id'] ?>" class="text-blue-600 hover:underline mr-2">Edit</a>
-        <a href="delete_teacher.php?id=<?= $teacher['id'] ?>" onclick="return confirm('Delete this teacher?')" class="text-red-600 hover:underline">Delete</a>
-    </td>
-</tr>
-<?php endwhile; ?>
-</tbody>
-</table>
-</div>
-
-</div>
-
-<!-- Footer -->
-<footer class="bg-indigo-600 text-white mt-6">
-  <div class="container mx-auto py-6 grid grid-cols-1 md:grid-cols-4 gap-4">
-    <div>
-      <h5 class="font-semibold mb-2">Quick Links</h5>
-      <a href="index.php" class="block hover:underline">Home</a>
-      <a href="#" class="block hover:underline">Our Programs</a>
-      <a href="about.php" class="block hover:underline">About Us</a>
-      <a href="notice.php" class="block hover:underline">Notice Board</a>
-    </div>
-    <div>
-      <h5 class="font-semibold mb-2">Follow Us</h5>
-      <div class="flex gap-2">
-        <a href="https://www.facebook.com/PECPoU" aria-label="Facebook">
-          <img src="https://img.icons8.com/ios-filled/24/ffffff/facebook-new.png" alt="Facebook"/>
-        </a>
-        <a href="https://www.instagram.com/pec.pkr/" aria-label="Instagram">
-          <img src="https://img.icons8.com/ios-filled/24/ffffff/instagram-new.png" alt="Instagram"/>
-        </a>
-      </div>
-    </div>
-    <div>
-      <h5 class="font-semibold mb-2">Contact Us</h5>
-      <p>Phirke Pokhara-8, Nepal</p>
-      <p>Phone: 061 581209</p>
-      <p>Email: info@pec.edu.np</p>
-    </div>
-    <div>
-      <h5 class="font-semibold mb-2">Useful Links</h5>
-      <a href="https://pu.edu.np/" class="block hover:underline">Pokhara University</a>
-      <a href="https://ctevt.org.np/" class="block hover:underline">CTEVT</a>
-      <a href="https://nec.gov.np/" class="block hover:underline">Nepal Engineering Council</a>
-      <a href="https://neanepal.org.np/" class="block hover:underline">Nepal Engineer's Association</a>
-    </div>
-  </div>
-  <div class="text-center py-3 bg-indigo-700">
-    <small>&copy; 2025 PEC Result Hub. All rights reserved.</small>
-  </div>
-</footer>
 
 <script>
-// Tab switching
-document.getElementById('tabStudents').addEventListener('click', function(){
-    document.getElementById('studentsTable').classList.remove('hidden');
-    document.getElementById('teachersTable').classList.add('hidden');
-    this.classList.add('bg-indigo-600','text-white');
-    document.getElementById('tabTeachers').classList.remove('bg-indigo-600','text-white');
-    document.getElementById('tabTeachers').classList.add('bg-gray-300','text-gray-800');
-});
+    const btnStudents = document.getElementById('btnStudents');
+    const btnTeachers = document.getElementById('btnTeachers');
+    const studentSection = document.getElementById('studentSection');
+    const teacherSection = document.getElementById('teacherSection');
 
-document.getElementById('tabTeachers').addEventListener('click', function(){
-    document.getElementById('teachersTable').classList.remove('hidden');
-    document.getElementById('studentsTable').classList.add('hidden');
-    this.classList.add('bg-indigo-600','text-white');
-    document.getElementById('tabStudents').classList.remove('bg-indigo-600','text-white');
-    document.getElementById('tabStudents').classList.add('bg-gray-300','text-gray-800');
-});
+    btnStudents.addEventListener('click', () => {
+        studentSection.classList.remove('hidden');
+        teacherSection.classList.add('hidden');
+        btnStudents.classList.add('tab-active');
+        btnStudents.classList.remove('text-slate-400');
+        btnTeachers.classList.remove('tab-active');
+        btnTeachers.classList.add('text-slate-400');
+    });
+
+    btnTeachers.addEventListener('click', () => {
+        teacherSection.classList.remove('hidden');
+        studentSection.classList.add('hidden');
+        btnTeachers.classList.add('tab-active');
+        btnTeachers.classList.remove('text-slate-400');
+        btnStudents.classList.remove('tab-active');
+        btnStudents.classList.add('text-slate-400');
+    });
 </script>
+
 </body>
 </html>

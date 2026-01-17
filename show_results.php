@@ -2,50 +2,123 @@
 session_start();
 require 'db_config.php';
 
-$dept_id     = intval($_GET['dept'] ?? 0);
-$sem         = intval($_GET['sem'] ?? 0);
-$result_type = $_GET['type'] ?? 'ut'; 
+// Input & validation
+$dept_id = isset($_GET['dept']) ? intval($_GET['dept']) : 0;
+$sem_id  = isset($_GET['sem'])  ? intval($_GET['sem'])  : 0;
+$type    = isset($_GET['type']) ? strtolower(trim($_GET['type'])) : '';
+$batch   = isset($_GET['batch']) ? trim($_GET['batch']) : '';
+$section = isset($_GET['section']) ? trim($_GET['section']) : '';
 
-if (!$dept_id || !$sem) {
-    die("<h3 style='color:red;text-align:center; margin-top:50px;'>Invalid parameters.</h3>");
+$valid_types = ['ut', 'assessment'];
+if (!$dept_id || !$sem_id || !in_array($type, $valid_types, true)) {
+    die('Invalid parameters provided.');
 }
 
-// Fetch Department Name for Header
-$dept_q = $conn->query("SELECT department_name FROM departments WHERE id = $dept_id");
-$dept_info = $dept_q->fetch_assoc();
+// Check publication status
+$pub_stmt = $conn->prepare("SELECT 1 FROM results_publish_status WHERE department_id=? AND semester_id=? AND result_type=? AND published=1 LIMIT 1");
+$pub_stmt->bind_param('iis', $dept_id, $sem_id, $type);
+$pub_stmt->execute();
+if ($pub_stmt->get_result()->num_rows === 0) {
+    die('Selected result is not published yet.');
+}
 
-/* ---------- 1. FETCH UNIQUE SUBJECTS ---------- */
-$subjects = [];
-$sub_q = $conn->prepare("
-    SELECT DISTINCT sm.id AS subject_master_id, sm.subject_name, sm.subject_code
-    FROM subjects_department_semester sds
-    JOIN subjects_master sm ON sds.subject_id = sm.id
-    WHERE sds.department_id = ? AND sds.semester_id = ?
-");
-$sub_q->bind_param("ii", $dept_id, $sem);
-$sub_q->execute();
-$res = $sub_q->get_result();
-while ($row = $res->fetch_assoc()) $subjects[] = $row;
+// Dynamic filters
+$where = [
+    's.department_id = ?',
+    'r.semester_id = ?'
+];
+$params = [$dept_id, $sem_id];
+$types  = 'ii';
 
-/* ---------- 2. FETCH STUDENTS & ORGANIZED RESULTS ---------- */
-$organized_results = [];
-$sql = "SELECT s.id as student_id, s.symbol_no, r.subject_id, r.ut_grade, r.grade_point, r.final_theory, r.practical_marks 
-        FROM students s 
-        LEFT JOIN results r ON s.id = r.student_id 
-        WHERE s.department_id = ? AND s.semester = ?
-        ORDER BY s.symbol_no ASC";
+if ($batch !== '') {
+    $where[] = 's.batch_year = ?';
+    $params[] = intval($batch);
+    $types   .= 'i';
+}
 
-$stmt = $conn->prepare($sql);
-$stmt->bind_param("ii", $dept_id, $sem);
-$stmt->execute();
-$res = $stmt->get_result();
+if ($section !== '') {
+    $where[] = 's.section = ?';
+    $params[] = $section;
+    $types   .= 's';
+}
 
-while ($row = $res->fetch_assoc()) {
+$where_sql = implode(' AND ', $where);
+
+// Subject list (ordered, exclude Project)
+$subject_sql = "
+    SELECT DISTINCT
+        COALESCE(CAST(sm.id AS CHAR), CONCAT('raw_', r.subject_code, '_', r.subject_id)) AS sub_key,
+        COALESCE(sm.subject_name, r.subject_code) AS subject_name,
+        sm.id AS sm_id
+    FROM results r
+    JOIN students s ON r.student_id = s.id
+    LEFT JOIN subjects_master sm ON r.subject_id = sm.id
+    WHERE {$where_sql}
+      AND COALESCE(sm.subject_name, r.subject_code) NOT LIKE '%Project%'
+    ORDER BY sm.id IS NULL, sm.id ASC, subject_name ASC
+";
+$sub_stmt = $conn->prepare($subject_sql);
+$sub_stmt->bind_param($types, ...$params);
+$sub_stmt->execute();
+$subjects = $sub_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
+// Student list
+$student_sql = "
+    SELECT DISTINCT s.id, s.symbol_no, s.full_name
+    FROM students s
+    JOIN results r ON r.student_id = s.id
+    WHERE {$where_sql}
+    ORDER BY s.symbol_no ASC
+";
+$stu_stmt = $conn->prepare($student_sql);
+$stu_stmt->bind_param($types, ...$params);
+$stu_stmt->execute();
+$students = $stu_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
+// Marks map per student/subject (exclude Project)
+$additional_cond = ($type === 'ut')
+    ? 'AND r.ut_obtain IS NOT NULL'
+    : 'AND (r.final_theory IS NOT NULL OR r.practical_marks IS NOT NULL OR r.grade_point IS NOT NULL)';
+
+$data_sql = "
+    SELECT
+        s.id AS student_id,
+        COALESCE(CAST(sm.id AS CHAR), CONCAT('raw_', r.subject_code, '_', r.subject_id)) AS sub_key,
+        COALESCE(sm.subject_name, r.subject_code) AS subject_name,
+        sm.credit_hours,
+        r.ut_obtain, r.ut_grade,
+        r.final_theory, r.practical_marks,
+        r.grade_point, r.letter_grade
+    FROM results r
+    JOIN students s ON r.student_id = s.id
+    LEFT JOIN subjects_master sm ON r.subject_id = sm.id
+    WHERE {$where_sql}
+      AND COALESCE(sm.subject_name, r.subject_code) NOT LIKE '%Project%'
+    {$additional_cond}
+";
+$data_stmt = $conn->prepare($data_sql);
+$data_stmt->bind_param($types, ...$params);
+$data_stmt->execute();
+$data_res = $data_stmt->get_result();
+
+$marks = [];
+while ($row = $data_res->fetch_assoc()) {
     $sid = $row['student_id'];
-    $organized_results[$sid]['symbol_no'] = $row['symbol_no'];
-    // Result table ko subject_id mathi ko subject_master_id sanga match hunuparchha
-    $organized_results[$sid]['marks'][$row['subject_id']] = $row;
+    $sk  = $row['sub_key'];
+    $marks[$sid][$sk] = $row;
 }
+
+// Names for header
+$dept_name = 'Department';
+$sem_name  = 'Semester';
+if ($dept_res = $conn->query("SELECT department_name FROM departments WHERE id = {$dept_id} LIMIT 1")) {
+    if ($drow = $dept_res->fetch_assoc()) { $dept_name = $drow['department_name']; }
+}
+if ($sem_res = $conn->query("SELECT semester_name FROM semesters WHERE id = {$sem_id} LIMIT 1")) {
+    if ($srow = $sem_res->fetch_assoc()) { $sem_name = $srow['semester_name']; }
+}
+
+$total_cols = 3 + count($subjects);
 ?>
 
 <!DOCTYPE html>
@@ -53,132 +126,139 @@ while ($row = $res->fetch_assoc()) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ledger - Sem <?= $sem ?></title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/all.min.css">
+    <title>Result - <?= htmlspecialchars(strtoupper($type)) ?></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        :root { --primary: #4361ee; --dark: #1e293b; --bg: #f8fafc; }
-        body { background: var(--bg); font-family: 'Inter', sans-serif; color: #334155; }
+        body { background: #f8fafc; font-family: 'Inter', sans-serif; }
+        .transcript-box { background: #fff; border-radius: 12px; padding: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); margin: 40px auto; max-width: 1200px; }
+        .table thead th { font-size: 0.9rem; letter-spacing: 0.3px; }
+        .subject-head { white-space: nowrap; }
+        .cell-mini { font-size: 0.85rem; line-height: 1.2; }
         
-        .ledger-container { max-width: 1400px; margin: 2rem auto; padding: 0 15px; }
-        .ledger-card { 
-            background: white; border-radius: 16px; 
-            border: 1px solid #e2e8f0; overflow: hidden;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
-        }
-
-        .header-section { 
-            background: white; padding: 30px; 
-            border-bottom: 2px solid #f1f5f9; text-align: center;
-        }
-        .clg-name { font-weight: 800; letter-spacing: -0.5px; color: var(--dark); font-size: 1.5rem; }
-        .badge-info { background: #eff6ff; color: #3b82f6; padding: 6px 16px; border-radius: 50px; font-weight: 600; font-size: 0.85rem; }
-
-        .table-responsive { padding: 0; }
-        .table { margin-bottom: 0; border-collapse: separate; border-spacing: 0; }
-        .table thead th { 
-            background: #f8fafc; color: #64748b; font-size: 0.75rem;
-            text-transform: uppercase; letter-spacing: 0.05em; padding: 15px;
-            border-bottom: 2px solid #e2e8f0; text-align: center;
-        }
-        .table tbody td { padding: 12px 15px; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; }
+        /* Mobile Responsive - Horizontal Scroll for Tables */
+        .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
         
-        .symbol-no { font-weight: 700; color: var(--primary); }
-        .grade-badge { 
-            padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.8rem;
-            display: inline-block; min-width: 35px;
+        @media (max-width: 992px) {
+            .transcript-box { padding: 20px; margin: 20px auto; }
+            .table { font-size: 0.85rem; }
+            .table thead th { font-size: 0.8rem; padding: 8px; }
+            .table tbody td { padding: 8px; }
         }
-        .grade-A { background: #dcfce7; color: #166534; }
-        .grade-F { background: #fee2e2; color: #991b1b; }
-        .grade-NQ { background: #fef3c7; color: #92400e; }
         
-        @media print {
-            .btn-print, .header-section button { display: none; }
-            .ledger-card { border: none; box-shadow: none; }
-            body { background: white; }
+        @media (max-width: 768px) {
+            .transcript-box { padding: 15px; margin: 15px 10px; border-radius: 10px; }
+            .transcript-box h3 { font-size: 1.3rem; }
+            .transcript-box h5 { font-size: 1rem; }
+            .table { font-size: 0.75rem; }
+            .table thead th { font-size: 0.7rem; padding: 6px; }
+            .table tbody td { padding: 6px; }
+            .cell-mini { font-size: 0.7rem; }
+        }
+        
+        @media (max-width: 576px) {
+            .transcript-box { padding: 10px; margin: 10px 5px; }
+            .transcript-box h3 { font-size: 1.1rem; }
+            .transcript-box h5 { font-size: 0.9rem; }
+            .transcript-box p { font-size: 0.75rem; }
+            .table { font-size: 0.7rem; }
+            .table thead th { font-size: 0.65rem; padding: 5px; }
+            .table tbody td { padding: 5px; }
         }
     </style>
 </head>
 <body>
+<?php include 'header.php'; ?>
 
-<div class="ledger-container">
-    <div class="ledger-card">
-        <div class="header-section">
-            <h2 class="clg-name mb-1 text-uppercase">Pokhara Engineering College</h2>
-            <p class="text-muted mb-3 fw-medium"><?= $dept_info['department_name'] ?> - Result Ledger</p>
-            <div class="d-flex justify-content-center gap-2 mb-4">
-                <span class="badge-info">Semester: <?= $sem ?></span>
-                <span class="badge-info">Exam: <?= strtoupper($result_type) ?></span>
-            </div>
-            <button class="btn btn-dark px-4 fw-bold shadow-sm" onclick="window.print()">
-                <i class="fas fa-print me-2"></i> Print Official Ledger
-            </button>
-        </div>
+<div class="transcript-box">
+    <div class="text-center mb-4">
+        <h3 class="fw-bold text-primary mb-1">POKHARA ENGINEERING COLLEGE</h3>
+        <h5 class="text-muted mb-1"><?= htmlspecialchars($dept_name) ?> | <?= htmlspecialchars($sem_name) ?></h5>
+        <p class="text-secondary mb-0 text-uppercase small fw-bold">
+            Result Type: <?= strtoupper($type) ?><?= $batch !== '' ? ' | Batch '.$batch : '' ?><?= $section !== '' ? ' | Section '.htmlspecialchars($section) : '' ?>
+        </p>
+    </div>
 
-        <div class="table-responsive">
-            <table class="table table-hover align-middle">
-                <thead>
+    <div class="table-responsive">
+    <table class="table table-bordered align-middle">
+        <thead class="bg-light text-center">
+            <tr>
+                <th>Symbol No.</th>
+                <th class="text-start">Student</th>
+                <?php foreach ($subjects as $sub): ?>
+                    <th class="subject-head text-center"><?= htmlspecialchars($sub['subject_name']) ?></th>
+                <?php endforeach; ?>
+                <th class="text-center">SGPA</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php if (count($students) > 0 && count($subjects) > 0): ?>
+                <?php foreach ($students as $stu): 
+                    $fail_any = false;
+                    $total_cr = 0.0;
+                    $total_pts = 0.0;
+                ?>
                     <tr>
-                        <th style="width: 60px;">SN</th>
-                        <th style="width: 150px;">Symbol No</th>
-                        <?php foreach ($subjects as $sub): ?>
-                            <th><?= htmlspecialchars($sub['subject_name']) ?></th>
-                        <?php endforeach; ?>
-                        <th style="background: #f1f5f9; color: var(--dark);">GPA</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php 
-                    $sn = 1;
-                    foreach ($organized_results as $student_id => $data): 
-                        $total_points = 0; $count = 0; $is_failed = false;
-                    ?>
-                    <tr>
-                        <td class="text-center text-muted"><?= $sn++ ?></td>
-                        <td class="text-center"><span class="symbol-no"><?= htmlspecialchars($data['symbol_no']) ?></span></td>
-                        
+                        <td class="fw-bold text-center"><?= htmlspecialchars($stu['symbol_no']) ?></td>
+                        <td class="text-start fw-semibold"><?= htmlspecialchars($stu['full_name']) ?></td>
                         <?php foreach ($subjects as $sub): 
-                            $m = $data['marks'][$sub['subject_master_id']] ?? null;
-                            
-                            if ($result_type == 'ut') {
-                                $display = $m['ut_grade'] ?? '-';
-                                $gp = $m['grade_point'] ?? 0;
-                            } else {
-                                $th = $m['final_theory'] ?? 0;
-                                $pr = $m['practical_marks'] ?? 0;
-                                $display = ($th + $pr) ?: '-';
-                                $gp = 0; 
+                            $cell = '-';
+                            $m = $marks[$stu['id']][$sub['sub_key']] ?? null;
+                            if ($m) {
+                                $cr = (float)($m['credit_hours'] ?? 3.0);
+                                if ($type === 'ut') {
+                                    $ut = isset($m['ut_obtain']) ? number_format((float)$m['ut_obtain'], 2) : '-';
+                                    $is_fail = (strtoupper(trim($m['ut_grade'] ?? '')) === 'F');
+                                    if (!$is_fail && isset($m['grade_point'])) {
+                                        $total_cr += $cr;
+                                        $total_pts += ((float)$m['grade_point']) * $cr;
+                                    } else {
+                                        $fail_any = $fail_any || $is_fail;
+                                    }
+                                    $cell = "<div class='cell-mini fw-bold text-primary'>{$ut}</div>";
+                                } else {
+                                    $th = isset($m['final_theory']) ? number_format((float)$m['final_theory'], 2) : '-';
+                                    $pr = isset($m['practical_marks']) ? number_format((float)$m['practical_marks'], 2) : '-';
+                                    $gp_float = (float)($m['grade_point'] ?? 0);
+                                    $is_fail = (strtoupper(trim($m['letter_grade'] ?? '')) === 'F') || ($gp_float <= 0);
+                                    if ($is_fail) {
+                                        $fail_any = true;
+                                    } else {
+                                        $total_cr += $cr;
+                                        $total_pts += $gp_float * $cr;
+                                    }
+                                    $cell = "<div class='cell-mini fw-bold'>Th: {$th}</div><div class='cell-mini'>Pr: {$pr}</div>";
+                                }
                             }
-
-                            if ($display == 'F') $is_failed = true;
-                            if ($gp > 0) { $total_points += $gp; $count++; }
-                            
-                            // Styling grades
-                            $gClass = '';
-                            if($display == 'F') $gClass = 'grade-F';
-                            else if($display != '-' && $result_type == 'ut') $gClass = 'grade-A';
                         ?>
-                            <td class="text-center">
-                                <span class="grade-badge <?= $gClass ?>"><?= $display ?></span>
-                            </td>
+                            <td class="text-center"><?= $cell ?></td>
                         <?php endforeach; ?>
-
-                        <td class="text-center fw-bold" style="background: #f8fafc;">
-                            <?php 
-                                if ($is_failed) echo "<span class='badge grade-F'>NQ</span>";
-                                else if ($count > 0) {
-                                    $gpa = round($total_points / $count, 2);
-                                    echo "<span class='text-primary'>$gpa</span>";
-                                } else echo "-";
+                        <td class="text-center fw-bold">
+                            <?php
+                                if (!$fail_any && $total_cr > 0) {
+                                    echo number_format($total_pts / $total_cr, 2);
+                                } else {
+                                    echo '-';
+                                }
                             ?>
                         </td>
                     </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <tr>
+                    <td colspan="<?= $total_cols ?>" class="text-center py-5">
+                        <div class="alert alert-warning d-inline-block mb-0">
+                            <i class="fas fa-search me-2"></i> No records found for this selection.
+                        </div>
+                    </td>
+                </tr>
+            <?php endif; ?>
+        </tbody>
+    </table>
     </div>
 </div>
 
+<?php include 'footer.php'; ?>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

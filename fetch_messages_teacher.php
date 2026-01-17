@@ -27,5 +27,25 @@ $res = $stmt->get_result();
 while($m=$res->fetch_assoc()){
     $cls = ($m['sender_type']=='teacher')?'teacher-message':'student-message';
     $time = date('h:i A', strtotime($m['created_at']));
-    echo "<div class='message $cls'>".htmlspecialchars($m['message'])."<div class='time'>$time</div></div>";
+    $msg_text = htmlspecialchars($m['message']);
+    
+    echo "<div class='message $cls'>";
+    if($msg_text) echo $msg_text;
+    
+    // Display attachment
+    if(!empty($m['attachment'])){
+        $file_path = $m['attachment'];
+        $file_ext = strtolower(pathinfo($file_path, PATHINFO_EXTENSION));
+        $file_name = basename($file_path);
+        
+        echo "<div class='attachment'>";
+        if(in_array($file_ext, ['jpg','jpeg','png','gif'])){
+            echo "<a href='$file_path' target='_blank'><img src='$file_path' alt='Image'></a>";
+        }else{
+            echo "<a href='$file_path' download='$file_name'>📎 $file_name</a>";
+        }
+        echo "</div>";
+    }
+    
+    echo "<div class='time'>$time</div></div>";
 }

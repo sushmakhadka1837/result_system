@@ -98,6 +98,28 @@ $unread_count = $stmt2->get_result()->fetch_assoc()['unread_count'];
             border-radius: 15px;
             font-size: 0.8rem;
         }
+
+        /* Mobile Responsive */
+        @media (max-width: 992px) {
+            .profile-sidebar { margin-bottom: 20px; }
+            .content-card { padding: 20px; margin-bottom: 20px; }
+        }
+
+        @media (max-width: 768px) {
+            .profile-sidebar { padding: 20px; }
+            .profile-sidebar img { width: 80px; height: 80px; }
+            .content-card { padding: 15px; border-radius: 16px; }
+            #calendar { font-size: 0.7rem; padding: 8px; }
+            .fc-toolbar { flex-direction: column; gap: 10px; }
+            .fc-toolbar-chunk { width: 100%; justify-content: center; }
+        }
+
+        @media (max-width: 576px) {
+            .profile-sidebar { padding: 15px; }
+            .profile-sidebar img { width: 70px; height: 70px; }
+            .content-card { padding: 12px; }
+            #calendar { font-size: 0.65rem; }
+        }
         .fc .fc-toolbar-title { font-size: 1.1rem; font-weight: 700; color: var(--navy); }
         .fc .fc-button-primary { background: var(--primary-blue); border: none; }
         
@@ -166,8 +188,7 @@ $unread_count = $stmt2->get_result()->fetch_assoc()['unread_count'];
                     <div class="small fw-bold mb-3"><?= htmlspecialchars($teacher['employee_id']); ?></div>
                 </div>
 
-                <button class="btn btn-outline-primary w-100 rounded-3 mt-3 fw-bold border-2" onclick="window.location.href='edit_profile.php'">
-                    Edit Profile
+                    
                 </button>
             </div>
         </div>
@@ -214,27 +235,7 @@ $unread_count = $stmt2->get_result()->fetch_assoc()['unread_count'];
         </div>
 
     </div> </div>
-<div class="mt-4">
-    <h5 class="fw-bold mb-3">Academic Insights</h5>
-    
-    <?php include 'analysis_widgets.php'; ?>
-    
-    <?php include 'performance_charts.php'; ?>
-    
-    <div class="row g-4 mt-1">
-        <div class="col-lg-8">
-            <?php include 'subject_toppers.php'; ?>
-        </div>
-        
-        <div class="col-lg-4">
-            <div class="content-card bg-primary p-4 rounded-4 text-white shadow-sm h-100">
-                <h5 class="fw-bold">Reports Need Attention?</h5>
-                <p class="small opacity-75">There are 8 students in CSIT 3rd Sem whose scores are below 35%.</p>
-                <button class="btn btn-light w-100 rounded-pill fw-bold mt-2">Send Warning/Email</button>
-            </div>
-        </div>
-    </div>
-</div>
+
 <?php include 'footer.php'; ?>
 
 <script>

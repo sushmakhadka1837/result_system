@@ -6,7 +6,7 @@
     <div class="footer-logo d-flex align-items-center mb-3">
       <img src="images/logoheader.png" alt="College Logo" class="footer-logo-img">
       <div class="ms-3">
-        <h5 class="mb-1">PEC Result Hub</h5>
+        <h5 class="mb-1">Hamro Result</h5>
         <p class="mb-0">Phirke, Pokhara-8, Nepal</p>
         <small>&copy; 2025 All rights reserved.</small>
       </div>

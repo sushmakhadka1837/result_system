@@ -38,6 +38,7 @@ while($row = $res->fetch_assoc()){
         'id' => $row['id'],
         'sender_type' => $row['sender_type'],
         'message' => htmlspecialchars($row['message']),
+        'attachment' => $row['attachment'] ?? null,
         'created_at' => date('h:i A, M d', strtotime($row['created_at']))
     ];
 }

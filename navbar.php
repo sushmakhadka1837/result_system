@@ -1,7 +1,7 @@
 <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
   <div class="container">
     <!-- Brand -->
-    <a class="navbar-brand" href="index.php">PEC RESULT-HUB</a>
+    <a class="navbar-brand" href="index.php">HAMRO RESULT</a>
 
     <!-- Toggler for mobile -->
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar">

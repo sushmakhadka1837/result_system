@@ -48,106 +48,147 @@ $images = !empty($notice['notice_images'])
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
 
 <style>
+:root{
+    --navy:#001f4d;
+    --navy-soft:#0f2d66;
+    --gold:#f4c430;
+    --bg:#f5f6fa;
+    --card:#ffffff;
+    --text:#1f2937;
+    --muted:#6b7280;
+}
+
 body{
     font-family: 'Poppins', sans-serif;
-    background:#f4f6f9;
-    padding:20px;
+    background:radial-gradient(circle at 15% 20%, rgba(244,196,48,0.1), transparent 28%),
+              radial-gradient(circle at 80% 10%, rgba(0,31,77,0.08), transparent 35%),
+              var(--bg);
+    padding:24px;
+    color:var(--text);
 }
 
 .notice-container{
-    max-width:900px;
+    max-width:960px;
     margin:auto;
-    background:#fff;
-    padding:30px 40px;
-    border-radius:14px;
-    box-shadow:0 8px 24px rgba(0,0,0,0.15);
+    background:var(--card);
+    padding:34px 42px;
+    border-radius:18px;
+    box-shadow:0 18px 45px rgba(0,31,77,0.12);
     position:relative;
+    border:1px solid rgba(0,31,77,0.06);
+    overflow:hidden;
+}
+
+.notice-container::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:linear-gradient(135deg, rgba(0,31,77,0.04) 0%, rgba(244,196,48,0.05) 100%);
+    opacity:0.7;
+    pointer-events:none;
 }
 
 .notice-logo{
     text-align:center;
-    margin-bottom:25px;
+    margin-bottom:28px;
+    position:relative;
+    z-index:1;
 }
 
-.notice-logo img{
-    height:90px;
-}
+.notice-logo img{ height:90px; }
 
 .download-icon{
     position:absolute;
-    top:30px;
-    right:40px;
-    color:#004085;
-    font-size:1.5rem;
+    top:26px;
+    right:30px;
+    color:var(--navy);
+    font-size:1.6rem;
     transition:0.2s;
+    z-index:2;
 }
-.download-icon:hover{
-    color:#001f4d;
-}
+.download-icon:hover{ color:var(--gold); }
 
 .notice-title{
     text-align:center;
-    font-weight:700;
-    font-size:1.9rem;
-    color:#001f4d;
-    margin-bottom:12px;
-    margin-top:0;
+    font-weight:800;
+    font-size:2rem;
+    color:var(--navy);
+    margin:0 0 14px;
+    position:relative;
+    z-index:1;
+}
+
+.notice-title::after{
+    content:"";
+    display:block;
+    width:70px;
+    height:4px;
+    border-radius:999px;
+    background:linear-gradient(90deg, var(--navy), var(--gold));
+    margin:10px auto 0;
 }
 
 .notice-meta{
     text-align:center;
-    color:#555;
+    color:var(--muted);
     font-size:0.95rem;
-    margin-bottom:15px;
+    margin-bottom:18px;
+    position:relative;
+    z-index:1;
 }
 
 .notice-meta div{
-    margin:3px 0;
+    margin:4px 0;
 }
 
 .notice-content{
     font-size:1.05rem;
-    line-height:1.7;
-    margin-bottom:25px;
+    line-height:1.75;
+    margin-bottom:26px;
+    position:relative;
+    z-index:1;
 }
 
 .notice-gallery{
     display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
-    gap:15px;
-    margin-bottom:20px;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:16px;
+    margin-bottom:10px;
+    position:relative;
+    z-index:1;
 }
 
 .notice-gallery img{
     width:100%;
     height:auto;
-    max-height:450px;
+    max-height:430px;
     object-fit:contain;
-    border-radius:10px;
+    border-radius:12px;
     cursor:pointer;
-    transition:0.2s;
+    transition:transform 0.2s ease, box-shadow 0.2s ease;
+    background:#f8fafc;
+    border:1px solid rgba(0,31,77,0.08);
 }
 
 .notice-gallery img:hover{
-    transform:scale(1.03);
+    transform:scale(1.02);
+    box-shadow:0 10px 24px rgba(0,31,77,0.15);
 }
 
 @media(max-width:768px){
-    .notice-container{
-        padding:20px;
-    }
-    .notice-title{
-        font-size:1.6rem;
-    }
-    .download-icon{
-        top:20px;
-        right:20px;
-    }
+    body{ padding:16px; }
+    .notice-container{ padding:22px; }
+    .notice-title{ font-size:1.65rem; }
+    .download-icon{ top:18px; right:18px; }
 }
 </style>
 </head>
 
 <body>
+
+<?php include 'header.php'; ?>
+
+<main class="py-4">
 <div class="notice-container">
 
     <!-- DOWNLOAD ICON -->
@@ -198,6 +239,9 @@ body{
     <?php endif; ?>
 
 </div>
+</main>
+
+<?php include 'footer.php'; ?>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
