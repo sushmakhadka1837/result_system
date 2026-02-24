@@ -198,7 +198,7 @@ $top_query = "SELECT s.full_name, s.symbol_no, r.$score_field as component_score
         AND r.semester_id = ?
         AND s.batch_year = ?
         AND r.$score_field > 0
-              ORDER BY r.$score_field DESC
+              ORDER BY s.symbol_no ASC
               LIMIT 10";
 $stmt = $conn->prepare($top_query);
 $stmt->bind_param("iii", $subject_id, $target_semester, $target_batch);
@@ -207,7 +207,6 @@ $top_performers = $stmt->get_result();
 
 // Focus Needed students
 if ($component === 'ut') {
-    // First try to get C+ grade or below students
     $bottom_query = "SELECT s.full_name, s.symbol_no, r.ut_obtain as component_score, r.ut_grade as component_grade, 
                             r.practical_marks, r.final_theory
                      FROM results r
@@ -215,31 +214,13 @@ if ($component === 'ut') {
                      WHERE r.subject_id = ? 
                      AND r.semester_id = ?
                      AND s.batch_year = ?
-                     AND r.ut_grade IN ('C+', 'C', 'C-', 'D+', 'D', 'F', 'NG')
-                     ORDER BY r.ut_obtain ASC";
+                     AND r.ut_grade IN ('C', 'C-', 'D+', 'D', 'F', 'NG')
+                     ORDER BY s.symbol_no ASC";
     $stmt = $conn->prepare($bottom_query);
     $stmt->bind_param("iii", $subject_id, $target_semester, $target_batch);
     $stmt->execute();
     $bottom_performers = $stmt->get_result();
-    
-    // If no C+ or below, get lowest scores
-    if ($bottom_performers->num_rows == 0) {
-        $bottom_query = "SELECT s.full_name, s.symbol_no, r.ut_obtain as component_score, r.ut_grade as component_grade, 
-                                r.practical_marks, r.final_theory
-                         FROM results r
-                         JOIN students s ON r.student_id = s.id
-                         WHERE r.subject_id = ?
-                         AND r.semester_id = ?
-                         AND s.batch_year = ?
-                         AND r.ut_obtain > 0
-                         ORDER BY r.ut_obtain ASC";
-        $stmt = $conn->prepare($bottom_query);
-        $stmt->bind_param("iii", $subject_id, $target_semester, $target_batch);
-        $stmt->execute();
-        $bottom_performers = $stmt->get_result();
-    }
 } else {
-    // First try to get B- grade or below students
     $bottom_query = "SELECT s.full_name, s.symbol_no, r.total_obtained as component_score, r.letter_grade as component_grade, 
                             r.practical_marks, r.final_theory
                      FROM results r
@@ -248,28 +229,11 @@ if ($component === 'ut') {
                      AND r.semester_id = ?
                      AND s.batch_year = ?
                      AND r.letter_grade IN ('B-', 'C+', 'C', 'C-', 'D+', 'D', 'F', 'NG')
-                     ORDER BY r.total_obtained ASC";
+                     ORDER BY s.symbol_no ASC";
     $stmt = $conn->prepare($bottom_query);
     $stmt->bind_param("iii", $subject_id, $target_semester, $target_batch);
     $stmt->execute();
     $bottom_performers = $stmt->get_result();
-
-    // If no B- or below students, get lowest total scores
-    if ($bottom_performers->num_rows == 0) {
-        $bottom_query = "SELECT s.full_name, s.symbol_no, r.total_obtained as component_score, r.letter_grade as component_grade, 
-                                r.practical_marks, r.final_theory
-                         FROM results r
-                         JOIN students s ON r.student_id = s.id
-                         WHERE r.subject_id = ?
-                         AND r.semester_id = ?
-                         AND s.batch_year = ?
-                         AND r.total_obtained > 0
-                         ORDER BY r.total_obtained ASC";
-        $stmt = $conn->prepare($bottom_query);
-        $stmt->bind_param("iii", $subject_id, $target_semester, $target_batch);
-        $stmt->execute();
-        $bottom_performers = $stmt->get_result();
-    }
 }
 ?>
 
@@ -636,8 +600,6 @@ if ($component === 'ut') {
                                         <th>Name</th>
                                         <th>Symbol No.</th>
                                         <th><?= $score_label ?> Score</th>
-                                        <th>Practical</th>
-                                        <th>Theory</th>
                                         <th>Grade</th>
                                     </tr>
                                 </thead>
@@ -653,14 +615,12 @@ if ($component === 'ut') {
                                             <td><?= htmlspecialchars($row['full_name']) ?></td>
                                             <td><?= htmlspecialchars($row['symbol_no']) ?></td>
                                             <td><?= round($row['component_score'] ?? 0, 1) ?></td>
-                                            <td><?= round($row['practical_marks'] ?? 0, 2) ?></td>
-                                            <td><?= round($row['final_theory'] ?? 0, 2) ?></td>
                                             <td><span class="badge-grade bg-success text-white"><?= $row['component_grade'] ?></span></td>
                                         </tr>
                                         <?php $rank++; endwhile; ?>
                                     <?php else: ?>
                                         <tr>
-                                            <td colspan="7" class="text-center text-muted py-3">No student data available.</td>
+                                            <td colspan="5" class="text-center text-muted py-3">No student data available.</td>
                                         </tr>
                                     <?php endif; ?>
                                 </tbody>
@@ -689,8 +649,6 @@ if ($component === 'ut') {
                                         <th>Name</th>
                                         <th>Symbol No.</th>
                                         <th><?= $score_label ?> Score</th>
-                                        <th>Practical</th>
-                                        <th>Theory</th>
                                         <th>Grade</th>
                                     </tr>
                                 </thead>
@@ -706,14 +664,12 @@ if ($component === 'ut') {
                                             <td><?= htmlspecialchars($row['full_name']) ?></td>
                                             <td><?= htmlspecialchars($row['symbol_no']) ?></td>
                                             <td><?= round($row['component_score'] ?? 0, 1) ?></td>
-                                            <td><?= round($row['practical_marks'] ?? 0, 2) ?></td>
-                                            <td><?= round($row['final_theory'] ?? 0, 2) ?></td>
                                             <td><span class="badge-grade bg-danger text-white"><?= $row['component_grade'] ?></span></td>
                                         </tr>
                                         <?php $rank++; endwhile; ?>
                                     <?php else: ?>
                                         <tr>
-                                            <td colspan="7" class="text-center text-muted py-3">No student data available.</td>
+                                            <td colspan="5" class="text-center text-muted py-3">No student data available.</td>
                                         </tr>
                                     <?php endif; ?>
                                 </tbody>
@@ -777,7 +733,6 @@ if ($component === 'ut') {
                                         <th>Rank</th>
                                         <th>Name</th>
                                         <th>Symbol No.</th>
-                                        <th><?= $score_label ?> Score</th>
                                         <th>Practical</th>
                                         <th>Theory</th>
                                         <th>Grade</th>
@@ -794,7 +749,6 @@ if ($component === 'ut') {
                                             <td><span class="rank-badge rank-<?= min($rank, 3) ?>">🏆</span></td>
                                             <td><?= htmlspecialchars($row['full_name']) ?></td>
                                             <td><?= htmlspecialchars($row['symbol_no']) ?></td>
-                                            <td><?= round($row['component_score'] ?? 0, 1) ?></td>
                                             <td><?= round($row['practical_marks'] ?? 0, 2) ?></td>
                                             <td><?= round($row['final_theory'] ?? 0, 2) ?></td>
                                             <td><span class="badge-grade bg-success text-white"><?= $row['component_grade'] ?></span></td>
@@ -802,7 +756,7 @@ if ($component === 'ut') {
                                         <?php $rank++; endwhile; ?>
                                     <?php else: ?>
                                         <tr>
-                                            <td colspan="7" class="text-center text-muted py-3">No student data available.</td>
+                                            <td colspan="6" class="text-center text-muted py-3">No student data available.</td>
                                         </tr>
                                     <?php endif; ?>
                                 </tbody>
@@ -826,7 +780,8 @@ if ($component === 'ut') {
                                         <th>Rank</th>
                                         <th>Name</th>
                                         <th>Symbol No.</th>
-                                        <th><?= $score_label ?> Score</th>
+                                        <th>Practical</th>
+                                        <th>Theory</th>
                                         <th>Grade</th>
                                     </tr>
                                 </thead>
@@ -841,13 +796,14 @@ if ($component === 'ut') {
                                             <td><span class="rank-badge rank-other"><?= $rank ?></span></td>
                                             <td><?= htmlspecialchars($row['full_name']) ?></td>
                                             <td><?= htmlspecialchars($row['symbol_no']) ?></td>
-                                            <td><?= round($row['component_score'] ?? 0, 1) ?></td>
+                                            <td><?= round($row['practical_marks'] ?? 0, 2) ?></td>
+                                            <td><?= round($row['final_theory'] ?? 0, 2) ?></td>
                                             <td><span class="badge-grade bg-danger text-white"><?= $row['component_grade'] ?></span></td>
                                         </tr>
                                         <?php $rank++; endwhile; ?>
                                     <?php else: ?>
                                         <tr>
-                                            <td colspan="5" class="text-center text-muted py-3">No student data available.</td>
+                                            <td colspan="6" class="text-center text-muted py-3">No student data available.</td>
                                         </tr>
                                     <?php endif; ?>
                                 </tbody>
@@ -857,7 +813,8 @@ if ($component === 'ut') {
                 </div>
             </div>
         </div><!-- End Assessment Data Section -->
-
+    </div>
+    <?php include 'footer.php'; ?>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     
     <script>

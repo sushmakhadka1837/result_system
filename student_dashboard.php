@@ -341,7 +341,7 @@ if (isset($_GET['show_requests']) && $_GET['show_requests'] === '1') {
             background: linear-gradient(180deg, rgba(255,255,255,0.12), transparent 65%);
         }
         .profile-img-container {
-            margin-top: -55px;
+            position: relative;
             text-align: center;
         }
         .profile-img-container img {
@@ -642,12 +642,12 @@ if (isset($_GET['show_requests']) && $_GET['show_requests'] === '1') {
             <div class="profile-sidebar">
                 <div class="profile-header-accent"></div>
                 <div class="profile-img-container">
-                    <form action="upload_profile.php" method="post" enctype="multipart/form-data" id="profileForm">
-                        <label for="profile_photo" style="cursor: pointer;">
-                            <img src="<?php echo !empty($student['profile_photo']) ? $student['profile_photo'] : 'images/default.png'; ?>" alt="Student Photo">
-                        </label>
-                        <input type="file" name="profile_photo" id="profile_photo" style="display:none;" onchange="document.getElementById('profileForm').submit()">
-                    </form>
+                    <a href="student_edit_profile.php" title="Click to edit profile" style="text-decoration: none;">
+                        <img src="<?php echo !empty($student['profile_photo']) ? htmlspecialchars($student['profile_photo']) : 'images/default.png'; ?>" alt="Student Photo" style="cursor: pointer; transition: all 0.3s ease;" onmouseover="this.style.transform='scale(1.05)'; this.style.filter='brightness(0.9)';" onmouseout="this.style.transform='scale(1)'; this.style.filter='brightness(1)';">
+                        <div style="position: absolute; bottom: 10px; right: 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);">
+                            <i class="fas fa-camera" style="color: white; font-size: 1rem;"></i>
+                        </div>
+                    </a>
                 </div>
                 <div class="profile-body">
                     <h4><?php echo htmlspecialchars($student['full_name']); ?></h4>
