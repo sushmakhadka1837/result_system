@@ -100,10 +100,11 @@ if (!function_exists('gradePoint')) {
     }
 }
 
-// 4. Check if results are published for this semester
+// 4. Check if results are published for this semester and batch
 $publish_check = $conn->query("
     SELECT published FROM results_publish_status 
     WHERE department_id = {$student['department_id']} 
+    AND batch_year = '{$student['batch_year']}' 
     AND semester_id = $selected_sem 
     AND result_type = 'ut'
 ");
@@ -359,18 +360,10 @@ $results_q = ($is_published == 1) ? $conn->query($results_sql) : null;
                 </tbody>
             </table>
 
-            <?php if($is_published == 1 && $total_cr > 0): ?>
-            <div class="mt-4 d-flex justify-content-between align-items-center">
+            <?php if($is_published == 1): ?>
+            <div class="mt-4">
                 <div class="text-muted small">
                     * This is a computer generated internal report.
-                </div>
-                <div class="p-3 rounded bg-dark text-white text-center shadow" style="min-width: 150px;">
-                    <small class="d-block opacity-75">UT GPA</small>
-                    <?php if($has_fail): ?>
-                        <h6 class="mb-0 fw-bold">N/A (has failed course)</h6>
-                    <?php else: ?>
-                        <h4 class="mb-0 fw-bold"><?= number_format($total_gp / $total_cr, 2) ?></h4>
-                    <?php endif; ?>
                 </div>
             </div>
             <?php endif; ?>

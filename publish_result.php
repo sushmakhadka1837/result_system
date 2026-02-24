@@ -52,7 +52,7 @@ $result = $stmt->get_result();
     </style>
 </head>
 <body>
-
+<?php include 'teacher_header.php'; ?>
 <div class="container">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h3>Publish Result for: <span class="text-primary"><?= htmlspecialchars($teacher['full_name']) ?></span></h3>
@@ -117,6 +117,6 @@ $result = $stmt->get_result();
         <?php endif; ?>
     </div>
 </div>
-
+<?php include 'footer.php'; ?>
 </body>
 </html>

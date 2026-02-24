@@ -26,38 +26,38 @@ if (isset($_POST['toggle_status'])) {
     if ($sem_id === 'all') {
         // Handle all semesters (1-8)
         for ($s = 1; $s <= 8; $s++) {
-            $check = $conn->query("SELECT id FROM results_publish_status WHERE department_id = $dept AND semester_id = $s AND result_type = 'assessment'");
+            $check = $conn->query("SELECT id FROM results_publish_status WHERE department_id = $dept AND batch_year = $batch AND semester_id = $s AND result_type = 'assessment'");
             
             if ($check->num_rows > 0) {
                 // Update existing record
                 if ($new_status == 1) {
-                    $conn->query("UPDATE results_publish_status SET published = 1, published_at = NOW() WHERE department_id = $dept AND semester_id = $s AND result_type = 'assessment'");
+                    $conn->query("UPDATE results_publish_status SET published = 1, published_at = NOW() WHERE department_id = $dept AND batch_year = $batch AND semester_id = $s AND result_type = 'assessment'");
                 } else {
-                    $conn->query("UPDATE results_publish_status SET published = 0 WHERE department_id = $dept AND semester_id = $s AND result_type = 'assessment'");
+                    $conn->query("UPDATE results_publish_status SET published = 0 WHERE department_id = $dept AND batch_year = $batch AND semester_id = $s AND result_type = 'assessment'");
                 }
             } else {
                 // Insert new record if publishing
                 if ($new_status == 1) {
-                    $conn->query("INSERT INTO results_publish_status (department_id, semester_id, result_type, published, published_at) VALUES ($dept, $s, 'assessment', 1, NOW())");
+                    $conn->query("INSERT INTO results_publish_status (department_id, batch_year, semester_id, result_type, published, published_at) VALUES ($dept, $batch, $s, 'assessment', 1, NOW())");
                 }
             }
         }
     } else {
         // Handle individual semester
         $sem_id_int = intval($sem_id);
-        $check = $conn->query("SELECT id FROM results_publish_status WHERE department_id = $dept AND semester_id = $sem_id_int AND result_type = 'assessment'");
+        $check = $conn->query("SELECT id FROM results_publish_status WHERE department_id = $dept AND batch_year = $batch AND semester_id = $sem_id_int AND result_type = 'assessment'");
         
         if ($check->num_rows > 0) {
             // Update existing record
             if ($new_status == 1) {
-                $conn->query("UPDATE results_publish_status SET published = 1, published_at = NOW() WHERE department_id = $dept AND semester_id = $sem_id_int AND result_type = 'assessment'");
+                $conn->query("UPDATE results_publish_status SET published = 1, published_at = NOW() WHERE department_id = $dept AND batch_year = $batch AND semester_id = $sem_id_int AND result_type = 'assessment'");
             } else {
-                $conn->query("UPDATE results_publish_status SET published = 0 WHERE department_id = $dept AND semester_id = $sem_id_int AND result_type = 'assessment'");
+                $conn->query("UPDATE results_publish_status SET published = 0 WHERE department_id = $dept AND batch_year = $batch AND semester_id = $sem_id_int AND result_type = 'assessment'");
             }
         } else {
             // Insert new record if publishing
             if ($new_status == 1) {
-                $conn->query("INSERT INTO results_publish_status (department_id, semester_id, result_type, published, published_at) VALUES ($dept, $sem_id_int, 'assessment', 1, NOW())");
+                $conn->query("INSERT INTO results_publish_status (department_id, batch_year, semester_id, result_type, published, published_at) VALUES ($dept, $batch, $sem_id_int, 'assessment', 1, NOW())");
             }
         }
     }
@@ -146,7 +146,7 @@ $f_batch = isset($_GET['batch']) ? intval($_GET['batch']) : null;
                     $has_data = ($stats['total'] > 0);
                     
                     // Check publish status from results_publish_status table
-                    $pub_check = $conn->query("SELECT published FROM results_publish_status WHERE department_id = $f_dept AND semester_id = $sem AND result_type = 'assessment'");
+                    $pub_check = $conn->query("SELECT published FROM results_publish_status WHERE department_id = $f_dept AND batch_year = $f_batch AND semester_id = $sem AND result_type = 'assessment'");
                     $is_published = ($pub_check && $pub_check->num_rows > 0 && $pub_check->fetch_assoc()['published'] == 1);
                 ?>
                 <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-indigo-300 transition group">

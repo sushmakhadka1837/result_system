@@ -64,7 +64,7 @@ $subjects = $sub_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
 // Student list
 $student_sql = "
-    SELECT DISTINCT s.id, s.symbol_no, s.full_name
+    SELECT DISTINCT s.id, s.symbol_no
     FROM students s
     JOIN results r ON r.student_id = s.id
     WHERE {$where_sql}
@@ -118,7 +118,7 @@ if ($sem_res = $conn->query("SELECT semester_name FROM semesters WHERE id = {$se
     if ($srow = $sem_res->fetch_assoc()) { $sem_name = $srow['semester_name']; }
 }
 
-$total_cols = 3 + count($subjects);
+$total_cols = 2 + count($subjects);
 ?>
 
 <!DOCTYPE html>
@@ -184,7 +184,6 @@ $total_cols = 3 + count($subjects);
         <thead class="bg-light text-center">
             <tr>
                 <th>Symbol No.</th>
-                <th class="text-start">Student</th>
                 <?php foreach ($subjects as $sub): ?>
                     <th class="subject-head text-center"><?= htmlspecialchars($sub['subject_name']) ?></th>
                 <?php endforeach; ?>
@@ -200,7 +199,6 @@ $total_cols = 3 + count($subjects);
                 ?>
                     <tr>
                         <td class="fw-bold text-center"><?= htmlspecialchars($stu['symbol_no']) ?></td>
-                        <td class="text-start fw-semibold"><?= htmlspecialchars($stu['full_name']) ?></td>
                         <?php foreach ($subjects as $sub): 
                             $cell = '-';
                             $m = $marks[$stu['id']][$sub['sub_key']] ?? null;

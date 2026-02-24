@@ -28,17 +28,18 @@ if (!empty($department)) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if ($result_type && $department && $semester) {
-        // Published status check garne
+    if ($result_type && $department && $semester && $batch) {
+        // Published status check garne (batch_year included)
         $check = $conn->prepare("
             SELECT id FROM results_publish_status 
             WHERE department_id = ? 
               AND semester_id = ? 
               AND result_type = ? 
+              AND batch_year = ? 
               AND published = 1 
             LIMIT 1
         ");
-        $check->bind_param("iis", $department, $semester, $result_type);
+        $check->bind_param("iiss", $department, $semester, $result_type, $batch);
         $check->execute();
         $res = $check->get_result();
 
@@ -47,10 +48,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header("Location: show_results.php?dept=$department&sem=$semester&type=$result_type&batch=$batch&section=$section");
             exit;
         } else {
-            $message = "Results for this selection have not been published yet.";
+            $message = "Results for this batch/semester have not been published yet.";
         }
     } else {
-        $message = "Please select all required fields (Type, Dept, Sem).";
+        $message = "Please select all required fields (Type, Dept, Sem, Batch).";
     }
 }
 ?>

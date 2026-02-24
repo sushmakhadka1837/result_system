@@ -101,9 +101,19 @@ $page_title = "Admin Dashboard | RMS";
                     <span class="font-medium">Publish Results</span>
                 </a>
 
+                <a href="admin_assessment_recheck_requests.php" class="sidebar-link flex items-center gap-3 px-3 py-3 rounded-xl transition-all group hover:text-white">
+                    <i class="fa-solid fa-rotate-left w-5 text-slate-500 group-hover:text-indigo-400"></i>
+                    <span class="font-medium">Recheck Requests</span>
+                </a>
+
                 <a href="manage_feedback.php" class="sidebar-link flex items-center gap-3 px-3 py-3 rounded-xl transition-all group hover:text-white">
                     <i class="fa-solid fa-comments w-5 text-slate-500 group-hover:text-indigo-400"></i>
-                    <span class="font-medium">Student Feedback</span>
+                    <span class="font-medium">Verified Feedback</span>
+                </a>
+
+                <a href="admin_view_pending_feedback.php" class="sidebar-link flex items-center gap-3 px-3 py-3 rounded-xl transition-all group hover:text-white">
+                    <i class="fa-solid fa-clock w-5 text-amber-500 group-hover:text-amber-400"></i>
+                    <span class="font-medium">Pending Feedback</span>
                 </a>
 
                 <a href="manage_testimonials.php" class="sidebar-link flex items-center gap-3 px-3 py-3 rounded-xl transition-all group hover:text-white">

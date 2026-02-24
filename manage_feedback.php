@@ -39,7 +39,10 @@ if(isset($_GET['delete'])){
                     <i class="fa-solid fa-house-chimney w-5"></i> Dashboard
                 </a>
                 <a href="manage_feedback.php" class="flex items-center gap-3 px-4 py-3 rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/20">
-                    <i class="fa-solid fa-comments w-5"></i> Manage Feedback
+                    <i class="fa-solid fa-comments w-5"></i> Verified Feedback
+                </a>
+                <a href="admin_view_pending_feedback.php" class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 transition-all text-slate-400">
+                    <i class="fa-solid fa-clock w-5"></i> Pending Feedback
                 </a>
                 </nav>
         </aside>
@@ -47,8 +50,8 @@ if(isset($_GET['delete'])){
         <main class="flex-1 md:ml-72 p-6 md:p-10">
             <div class="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
                 <div>
-                    <h1 class="text-3xl font-bold text-slate-900 tracking-tight">Student Feedback</h1>
-                    <p class="text-slate-500">Students le pathayeko guansho ra sujhav haru yaha herna sakincha.</p>
+                    <h1 class="text-3xl font-bold text-slate-900 tracking-tight">Verified Feedback</h1>
+                    <p class="text-slate-500">Email verify bhayeko genuine feedback haru yaha herna sakincha.</p>
                 </div>
                 
                 <div class="relative group w-full md:w-96">
@@ -70,6 +73,7 @@ if(isset($_GET['delete'])){
                                 <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Student Info</th>
                                 <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Message</th>
                                 <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Date</th>
+                                <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Status</th>
                                 <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Actions</th>
                             </tr>
                         </thead>
@@ -102,6 +106,17 @@ if(isset($_GET['delete'])){
                                     </span>
                                 </td>
                                 <td class="px-6 py-5 text-center">
+                                    <?php if($row['verified_at']): ?>
+                                        <span class="inline-flex items-center px-3 py-1 rounded-full bg-green-50 text-green-600 text-[11px] font-bold gap-1">
+                                            <i class="fa-solid fa-circle-check"></i> Verified
+                                        </span>
+                                    <?php else: ?>
+                                        <span class="inline-flex items-center px-3 py-1 rounded-full bg-amber-50 text-amber-600 text-[11px] font-bold gap-1">
+                                            <i class="fa-solid fa-clock"></i> Pending
+                                        </span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="px-6 py-5 text-center">
                                     <a href="?delete=<?= $row['id'] ?>" 
                                        onclick="return confirm('K tapai yo feedback delete garna chahanuhuncha?');"
                                        class="h-9 w-9 inline-flex items-center justify-center rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-600 hover:text-white transition-all shadow-sm"
@@ -112,7 +127,7 @@ if(isset($_GET['delete'])){
                             </tr>
                             <?php endwhile; else: ?>
                             <tr>
-                                <td colspan="5" class="px-6 py-20 text-center">
+                                <td colspan="6" class="px-6 py-20 text-center">
                                     <div class="flex flex-col items-center gap-3">
                                         <i class="fa-solid fa-inbox text-5xl text-slate-200"></i>
                                         <p class="text-slate-400 font-medium">Kunai feedback bhetiyena.</p>

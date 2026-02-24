@@ -15,13 +15,29 @@ $dept_res = $conn->query("SELECT department_name FROM departments WHERE id = $f_
 $dept_row = $dept_res->fetch_assoc();
 $dept_name = $dept_row ? $dept_row['department_name'] : 'N/A';
 
-// 2. Fetch unique subjects (Project excluded)
-$sub_query = "SELECT DISTINCT sub.id, sub.subject_code, sub.subject_name, sub.credit_hours 
-              FROM results r
-              JOIN subjects_master sub ON r.subject_id = sub.id
-              WHERE r.semester_id = $f_sem 
-              AND sub.subject_name NOT LIKE '%Project%' 
-              ORDER BY sub.subject_code ASC";
+// Convert student batch to syllabus flag (1=New, NULL/2=Old)
+$syllabus_flag = ($f_batch >= 2023) ? 1 : 'NULL';
+
+// 2. Fetch unique subjects (Project excluded) - FILTERED BY BATCH
+if($syllabus_flag === 'NULL') {
+    $sub_query = "SELECT DISTINCT sub.id, sub.subject_code, sub.subject_name, sub.credit_hours 
+                  FROM results r
+                  JOIN subjects_master sub ON r.subject_id = sub.id
+                  LEFT JOIN subjects_department_semester sds ON sub.id = sds.subject_id
+                  WHERE r.semester_id = $f_sem 
+                  AND sub.subject_name NOT LIKE '%Project%'
+                  AND (sds.syllabus_flag IS NULL OR sds.syllabus_flag = 2)
+                  ORDER BY sub.subject_code ASC";
+} else {
+    $sub_query = "SELECT DISTINCT sub.id, sub.subject_code, sub.subject_name, sub.credit_hours 
+                  FROM results r
+                  JOIN subjects_master sub ON r.subject_id = sub.id
+                  LEFT JOIN subjects_department_semester sds ON sub.id = sds.subject_id
+                  WHERE r.semester_id = $f_sem 
+                  AND sub.subject_name NOT LIKE '%Project%'
+                  AND sds.syllabus_flag = $syllabus_flag
+                  ORDER BY sub.subject_code ASC";
+}
 $sub_result = $conn->query($sub_query);
 $subjects = [];
 while($s = $sub_result->fetch_assoc()) {

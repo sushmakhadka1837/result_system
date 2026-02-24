@@ -56,11 +56,22 @@ if (isset($_POST['filter'])) {
     $f_sem = intval($_POST['semester']);
     $f_batch = intval($_POST['batch_year']);
 
-    if ($f_batch <= 2022) {
-        $sql = "SELECT sm.id, sm.subject_name, sm.subject_code FROM subjects_department_semester sds JOIN subjects_master sm ON sm.id = sds.subject_id WHERE sds.department_id=$f_dept AND sds.semester=$f_sem AND (sds.batch_year IS NULL OR sds.batch_year <= 2022)";
-    } else {
-        $sql = "SELECT sm.id, sm.subject_name, sm.subject_code FROM subjects_department_semester sds JOIN subjects_master sm ON sm.id = sds.subject_id WHERE sds.department_id=$f_dept AND sds.semester=$f_sem AND sds.batch_year > 2022";
-    }
+    // Filter subjects by batch/syllabus: batch > 2022 = syllabus_flag 1, else 0 or NULL
+    $syllabus_condition = ($f_batch > 2022) ? "sds.syllabus_flag = 1" : "(sds.syllabus_flag = 0 OR sds.syllabus_flag IS NULL)";
+
+    // Old syllabus subjects were historically stored without a specific batch_year; fall back to NULL or <=2022 mappings
+    // New syllabus subjects might be mapped once (e.g., 2023) or stored as sentinel 1; allow reuse for later new batches
+    $batch_filter = ($f_batch > 2022)
+        ? "(sds.batch_year = $f_batch OR sds.batch_year IS NULL OR sds.batch_year >= 2023 OR sds.batch_year = 1)"  // New syllabus: accept baseline/sentinel rows
+        : "(sds.batch_year = $f_batch OR sds.batch_year IS NULL OR sds.batch_year <= 2022)"; // Old syllabus: allow legacy rows
+
+    $sql = "SELECT sm.id, sm.subject_name, sm.subject_code 
+            FROM subjects_department_semester sds 
+            JOIN subjects_master sm ON sm.id = sds.subject_id 
+            WHERE sds.department_id=$f_dept 
+              AND sds.semester=$f_sem 
+              AND $batch_filter 
+              AND $syllabus_condition";
     $subjects = $conn->query($sql);
 }
 

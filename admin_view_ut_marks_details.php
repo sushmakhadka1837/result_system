@@ -10,41 +10,71 @@ if (!$dept_id || !$batch || !$sem) {
     die("<div style='padding:20px; color:red;'>Invalid Parameters.</div>");
 }
 
-// 1. SYLLABUS LOGIC
-$batch_code_filter = ($batch >= 2024) ? "sds.batch_year = 1" : "sds.batch_year IS NULL";
+// 1. SYLLABUS LOGIC - old/new split via syllabus_flag (project-wide standard)
+$syllabus_condition = ($batch >= 2023)
+    ? "sds.syllabus_flag = 1"
+    : "(sds.syllabus_flag IS NULL OR sds.syllabus_flag = 0 OR sds.syllabus_flag = 2)";
+$excluded_subject_condition = "
+    LOWER(sm.subject_name) NOT LIKE '%internship%'
+    AND LOWER(sm.subject_name) NOT LIKE '%project%'
+    AND LOWER(sm.subject_name) NOT LIKE '%elective iii%'
+";
 
-/**
- * 2. FIXED SUBJECT QUERY
- * Loop ma subject_id ko sequencing miluna ORDER BY sm.id use gareko chhu.
- */
+// 2. FIXED SUBJECT QUERY
+// Admin-upload भएका subjects लाई results table बाट priority dina (exact batch + sem)
 $subjects = [];
 $sub_sql = "
+    (SELECT DISTINCT sm.id, sm.subject_name, sm.is_elective, sm.credit_hours, sm.subject_code
+     FROM results r
+     JOIN students st ON st.id = r.student_id
+     JOIN subjects_master sm ON sm.id = r.subject_id
+         JOIN subjects_department_semester sds ON sds.subject_id = sm.id
+     WHERE st.department_id = $dept_id
+       AND st.batch_year = '$batch'
+       AND r.semester_id = $sem
+             AND sds.department_id = $dept_id
+             AND sds.semester = $sem
+             AND ($syllabus_condition)
+             AND sm.subject_type != 'Project'
+             AND ($excluded_subject_condition))
+    UNION
     (SELECT sm.id, sm.subject_name, sm.is_elective, sm.credit_hours, sm.subject_code
      FROM subjects_master sm
      JOIN subjects_department_semester sds ON sm.id = sds.subject_id
      WHERE sds.department_id = $dept_id AND sds.semester = $sem 
-     AND $batch_code_filter AND sm.subject_type != 'Project')
+         AND ($syllabus_condition) AND sm.subject_type != 'Project'
+         AND ($excluded_subject_condition))
     UNION
     (SELECT DISTINCT sm.id, sm.subject_name, sm.is_elective, sm.credit_hours, sm.subject_code
      FROM subjects_master sm
      JOIN student_electives se ON sm.id = se.elective_option_id
-     WHERE se.semester_id = $sem AND se.department_id = $dept_id AND sm.subject_type != 'Project')
-    ORDER BY id ASC"; // Database ID kai order ma rakha mapping milcha
+     JOIN subjects_department_semester sds ON sm.id = sds.subject_id
+        JOIN students st2 ON st2.id = se.student_id
+     WHERE se.semester_id = $sem AND se.department_id = $dept_id 
+            AND st2.department_id = $dept_id AND st2.batch_year = '$batch'
+         AND ($syllabus_condition) AND sm.subject_type != 'Project'
+         AND ($excluded_subject_condition))
+    ORDER BY id ASC";
 
 $sub_q = $conn->query($sub_sql);
 while($s = $sub_q->fetch_assoc()) {
     $subjects[$s['id']] = $s;
 }
 
-// 3. STUDENT ELECTIVE MAPPING
+// 3. STUDENT ELECTIVE MAPPING (same batch/department only)
 $electives_map = [];
-$el_res = $conn->query("SELECT student_id, elective_option_id FROM student_electives WHERE semester_id = $sem AND department_id = $dept_id");
+$el_res = $conn->query("SELECT se.student_id, se.elective_option_id
+                                                FROM student_electives se
+                                                JOIN students s ON s.id = se.student_id
+                                                WHERE se.semester_id = $sem
+                                                    AND se.department_id = $dept_id
+                                                    AND s.batch_year = '$batch'");
 while($el = $el_res->fetch_assoc()){
     $electives_map[$el['student_id']][] = $el['elective_option_id'];
 }
 
 // 4. FETCH RESULTS (Subject ID lai map garna array key ma rakha)
-$sql = "SELECT s.id as sid, s.full_name, s.symbol_no, 
+$sql = "SELECT s.id as sid, s.full_name, s.symbol_no, s.batch_year,
                r.subject_id, r.ut_obtain, r.ut_pass_marks, r.ut_grade
         FROM students s
         LEFT JOIN results r ON s.id = r.student_id AND r.semester_id = $sem
@@ -57,7 +87,12 @@ $display_data = [];
 while($row = $res->fetch_assoc()) {
     $sid = $row['sid'];
     if(!isset($display_data[$sid])) {
-        $display_data[$sid] = ['name' => $row['full_name'], 'symbol' => $row['symbol_no'], 'marks' => []];
+        $display_data[$sid] = [
+            'name' => $row['full_name'],
+            'symbol' => $row['symbol_no'],
+            'batch' => $row['batch_year'],
+            'marks' => []
+        ];
     }
     // Result table ko marks lai subject_id ko key bhitra rakhne
     if($row['subject_id']) {
@@ -98,9 +133,11 @@ function getGradePoint($grade) {
                     <tr class="border-b border-slate-300">
                         <th class="p-3 sticky-col bg-slate-200">Symbol</th>
                         <th class="p-3 text-left">Student Name</th>
+                        <th class="p-3">Batch</th>
                         <?php foreach($subjects as $sub_id => $sub): ?>
                             <th class="p-3 border-l border-slate-300">
                                 <?= $sub['subject_name'] ?><br>
+                                <span class="text-[9px] font-semibold text-slate-600"><?= $sub['subject_code'] ?></span><br>
                                 <span class="text-[9px] font-normal text-slate-500">(CH: <?= $sub['credit_hours'] ?>)</span>
                             </th>
                         <?php endforeach; ?>
@@ -118,6 +155,7 @@ function getGradePoint($grade) {
     <tr class="hover:bg-blue-50">
         <td class="p-3 font-mono font-bold sticky-col bg-inherit"><?= $stu['symbol'] ?></td>
         <td class="p-3 text-left font-bold uppercase"><?= $stu['name'] ?></td>
+        <td class="p-3 font-semibold text-slate-700"><?= $stu['batch'] ?></td>
         
         <?php foreach($subjects as $sub_id => $sub_info): ?>
             <?php 

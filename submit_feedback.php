@@ -1,59 +1,54 @@
 <?php
 require 'db_config.php';
-require 'vendor/autoload.php'; // Composer autoload
-
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
+require 'mail_config.php'; // Updated to use mail_config.php
 
 if($_SERVER['REQUEST_METHOD'] === 'POST'){
     $name = trim($_POST['student_name']);
     $email = trim($_POST['student_email']);
     $feedback = trim($_POST['feedback']);
 
-    if($name && $feedback){
-        // Save feedback in DB
-        $stmt = $conn->prepare("INSERT INTO student_feedback (student_name, student_email, feedback) VALUES (?,?,?)");
-        $stmt->bind_param("sss", $name, $email, $feedback);
-        if($stmt->execute()){
-            // Send Gmail notification
-            $mail = new PHPMailer(true);
-            try {
-                $mail->isSMTP();
-                $mail->Host = 'smtp.gmail.com';
-                $mail->SMTPAuth = true;
-                $mail->Username = 'youradmin@gmail.com'; // Admin Gmail
-                $mail->Password = 'your_app_password'; // Gmail App Password
-                $mail->SMTPSecure = 'tls';
-                $mail->Port = 587;
-
-                $mail->setFrom('youradmin@gmail.com', 'Result Hub Admin');
-                $mail->addAddress('youradmin@gmail.com'); // Admin Gmail
-
-                $mail->isHTML(true);
-                $mail->Subject = 'New Student Feedback Submitted';
-                $mail->Body = "
-                    <h3>New Feedback Received</h3>
-                    <p><strong>Name:</strong> {$name}</p>
-                    <p><strong>Email:</strong> {$email}</p>
-                    <p><strong>Feedback:</strong><br>{$feedback}</p>
-                ";
-
-                $mail->send();
-            } catch (Exception $e) {
-                error_log("Mailer Error: " . $mail->ErrorInfo);
-            }
-
+    if($name && $email && $feedback){
+        // Validate email format
+        if(!filter_var($email, FILTER_VALIDATE_EMAIL)){
             echo "<script>
-                alert('Thank you for your feedback!');
-                window.location='index.php';
+                alert('Please enter a valid email address!');
+                window.history.back();
             </script>";
+            exit;
+        }
 
+        // Generate verification token
+        $verification_token = bin2hex(random_bytes(32));
+        
+        // Save to pending feedback table
+        $stmt = $conn->prepare("INSERT INTO student_feedback_pending (student_name, student_email, feedback, verification_token, is_verified) VALUES (?,?,?,?,0)");
+        $stmt->bind_param("ssss", $name, $email, $feedback, $verification_token);
+        
+        if($stmt->execute()){
+            // Create verification link
+            $base_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]";
+            $verification_link = $base_url . dirname($_SERVER['PHP_SELF']) . "/verify_feedback.php?token=" . $verification_token;
+            
+            // Send verification email
+            if(sendFeedbackVerification($email, $name, $verification_link)){
+                echo "<script>
+                    alert('✅ Thank you! Please check your email ($email) to verify your feedback.');
+                    window.location='index.php';
+                </script>";
+            } else {
+                echo "<script>
+                    alert('Feedback saved but verification email failed to send. Please contact admin.');
+                    window.location='index.php';
+                </script>";
+            }
         } else {
             echo "DB Error: " . $conn->error;
         }
+        $stmt->close();
     } else {
         echo "<script>alert('Please fill all required fields'); window.history.back();</script>";
     }
 }else{
     header("Location: index.php");
 }
+?>

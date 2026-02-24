@@ -17,8 +17,19 @@
         $unread_result = $stmt->get_result();
         $unread_data = $unread_result->fetch_assoc();
         $unread_count = $unread_data['unread_count'] ?? 0;
+
+        $pending_recheck_count = 0;
+        $recheck_table_check = $conn->query("SHOW TABLES LIKE 'assessment_recheck_requests'");
+        if ($recheck_table_check && $recheck_table_check->num_rows > 0) {
+            $recheck_stmt = $conn->prepare("SELECT COUNT(*) AS cnt FROM assessment_recheck_requests WHERE assigned_teacher_id = ? AND status = 'pending'");
+            $recheck_stmt->bind_param("i", $teacher_id);
+            $recheck_stmt->execute();
+            $recheck_row = $recheck_stmt->get_result()->fetch_assoc();
+            $pending_recheck_count = (int)($recheck_row['cnt'] ?? 0);
+        }
     } else {
         $unread_count = 0;
+        $pending_recheck_count = 0;
     }
     ?>
     
@@ -126,19 +137,22 @@
 
         .nav-badge {
             position: absolute;
-            top: -5px;
-            right: -8px;
-            background: #f57dff; /* Unique pinkish-red for attention */
+            top: -6px;
+            right: -10px;
+            background: #ff3b30;
             color: #fff;
             font-size: 10px;
             font-weight: 700;
-            min-width: 18px;
-            height: 18px;
-            border-radius: 10px;
+            line-height: 1;
+            min-width: 20px;
+            height: 20px;
+            padding: 0 5px;
+            border-radius: 999px;
             display: flex;
             align-items: center;
             justify-content: center;
             border: 2px solid var(--navy-blue);
+            box-shadow: 0 4px 10px rgba(255, 59, 48, 0.35);
         }
 
         /* Logout Button */
@@ -256,7 +270,15 @@
         <a href="publish_result.php" class="nav-link">
             <i class="fas fa-poll"></i> Results
         </a>
-        
+        <a href="teacher_assessment_recheck_requests.php" class="nav-link badge-container">
+            <i class="fas fa-rotate-left"></i> Recheck
+            <?php if($pending_recheck_count > 0): ?>
+                <span class="nav-badge"><?= $pending_recheck_count ?></span>
+            <?php endif; ?>
+        </a>
+         <a href="teacher_class_analysis.php" class="nav-link">
+            <i class="fas fa-chart-line"></i> Analytics
+        </a>
         <div class="divider"></div>
 
         <a href="teacher_chat.php" class="nav-link badge-container">

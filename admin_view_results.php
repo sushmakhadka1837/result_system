@@ -3,15 +3,33 @@ session_start();
 require_once 'db_config.php';
 require_once 'mail_config.php';
 
-$dept_id = $_GET['dept_id'] ?? '';
+$dept_id = intval($_GET['dept_id'] ?? 0);
 $batch   = $_GET['batch'] ?? '';
+$semester = isset($_GET['semester']) ? intval($_GET['semester']) : 0;
+$sem_id_param = isset($_GET['sem_id']) ? intval($_GET['sem_id']) : 0;
 $message = "";
 $result_type = $_GET['type'] ?? 'ut'; // Default UT
 
 // --- 1. PUBLISH WITH EMAIL NOTIFICATION ---
 if (isset($_POST['publish_with_email'])) {
-    $result_type = $_POST['result_type'] ?? 'ut';
-    $type_label = ($result_type == 'ut') ? 'UT' : 'Assessment';
+    $result_type = strtolower($_POST['result_type'] ?? 'ut');
+    $type_label = ($result_type === 'assessment') ? 'Assessment' : 'UT';
+    $result_type_db = ($result_type === 'assessment') ? 'assessment' : 'ut';
+    $sem_id = $sem_id_param ?: ($semester ?: 0);
+
+    // Ensure DB reflects publish action for this semester/batch before emails
+    if ($dept_id && $batch && $sem_id) {
+        $up_results = "UPDATE results r 
+                       JOIN students s ON r.student_id = s.id 
+                       SET r.published = 1 
+                       WHERE s.department_id = $dept_id AND s.batch_year = '$batch' AND r.semester_id = $sem_id";
+        $conn->query($up_results);
+
+        $publish_status_sql = "INSERT INTO results_publish_status (department_id, batch_year, semester_id, result_type, published, published_at) 
+                               VALUES ('$dept_id', '$batch', '$sem_id', '$result_type_db', 1, NOW()) 
+                               ON DUPLICATE KEY UPDATE batch_year = VALUES(batch_year), published = 1, published_at = NOW()";
+        $conn->query($publish_status_sql);
+    }
     
     // Get all students for this department and batch
     $students = $conn->query("SELECT id, email, full_name FROM students WHERE department_id = $dept_id AND batch_year = '$batch'");
@@ -77,9 +95,9 @@ if (isset($_POST['publish_all'])) {
 
     // B. results_publish_status table ma entry thapne (1 dekhi 8 semester samma)
     for ($i = 1; $i <= 8; $i++) {
-        $publish_status_sql = "INSERT INTO results_publish_status (department_id, semester_id, result_type, published, published_at) 
-                               VALUES ('$dept_id', '$i', 'UT', 1, NOW()) 
-                               ON DUPLICATE KEY UPDATE published = 1, published_at = NOW()";
+        $publish_status_sql = "INSERT INTO results_publish_status (department_id, batch_year, semester_id, result_type, published, published_at) 
+                               VALUES ('$dept_id', '$batch', '$i', 'ut', 1, NOW()) 
+                               ON DUPLICATE KEY UPDATE batch_year = VALUES(batch_year), published = 1, published_at = NOW()";
         $conn->query($publish_status_sql);
     }
     
@@ -140,9 +158,9 @@ if (isset($_POST['toggle_status'])) {
         $conn->query($up_results);
         
         // B. Update results_publish_status table
-        $publish_status_sql = "INSERT INTO results_publish_status (department_id, semester_id, result_type, published, published_at) 
-                               VALUES ('$dept_id', '$s_id', 'UT', $new_status, NOW()) 
-                               ON DUPLICATE KEY UPDATE published = $new_status, published_at = NOW()";
+        $publish_status_sql = "INSERT INTO results_publish_status (department_id, batch_year, semester_id, result_type, published, published_at) 
+                       VALUES ('$dept_id', '$batch', '$s_id', 'ut', $new_status, NOW()) 
+                       ON DUPLICATE KEY UPDATE batch_year = VALUES(batch_year), published = $new_status, published_at = NOW()";
         
         if($conn->query($publish_status_sql)) {
             // C. Send email notifications to all students
@@ -195,9 +213,9 @@ if (isset($_POST['toggle_status'])) {
                        WHERE s.department_id = $dept_id AND s.batch_year = '$batch' AND r.semester_id = $s_id";
         $conn->query($up_results);
 
-        $publish_status_sql = "INSERT INTO results_publish_status (department_id, semester_id, result_type, published, published_at) 
-                               VALUES ('$dept_id', '$s_id', 'UT', $new_status, NOW()) 
-                               ON DUPLICATE KEY UPDATE published = $new_status, published_at = NOW()";
+        $publish_status_sql = "INSERT INTO results_publish_status (department_id, batch_year, semester_id, result_type, published, published_at) 
+                               VALUES ('$dept_id', '$batch', '$s_id', 'ut', $new_status, NOW()) 
+                               ON DUPLICATE KEY UPDATE batch_year = VALUES(batch_year), published = $new_status, published_at = NOW()";
         $conn->query($publish_status_sql);
         
         $message = "<div class='bg-yellow-500 text-white p-4 rounded-lg mb-4 shadow-lg font-semibold'>⚠️ Semester $s_id Unpublished.</div>";
@@ -245,7 +263,7 @@ if (isset($_POST['toggle_status'])) {
         </div>
 
         <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-8">
-            <form method="GET" class="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+            <form method="GET" class="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
                 <div>
                     <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Department</label>
                     <select name="dept_id" class="w-full border p-3 rounded-xl bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500" required>
@@ -261,10 +279,22 @@ if (isset($_POST['toggle_status'])) {
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Batch Year</label>
-                    <input type="number" name="batch" value="<?= $batch ?>" placeholder="e.g. 2024" class="w-full border p-3 rounded-xl bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500" required>
+                    <input type="number" name="batch" value="<?= $batch ?>" placeholder="e.g. 2024" class="w-full border p-3 rounded-xl bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Semester</label>
+                    <select name="semester" class="w-full border p-3 rounded-xl bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option value="">-- All Semesters --</option>
+                        <?php 
+                        for($i = 1; $i <= 8; $i++) {
+                            $sel = ($semester == $i) ? 'selected' : '';
+                            echo "<option value='$i' $sel>Semester $i</option>";
+                        }
+                        ?>
+                    </select>
                 </div>
                 <button type="submit" class="bg-slate-800 text-white p-3.5 rounded-xl font-bold hover:bg-black shadow-lg transition-all">
-                    Search Semesters
+                    Search Results
                 </button>
             </form>
         </div>
@@ -284,7 +314,10 @@ if (isset($_POST['toggle_status'])) {
                 </thead>
                 <tbody class="divide-y divide-slate-100">
                     <?php 
-                    for($i = 1; $i <= 8; $i++): 
+                    $start_sem = $semester ? $semester : 1;
+                    $end_sem = $semester ? $semester : 8;
+                    
+                    for($i = $start_sem; $i <= $end_sem; $i++): 
                         $check = $conn->query("SELECT published FROM results r 
                                                JOIN students s ON r.student_id = s.id 
                                                WHERE s.department_id = $dept_id AND s.batch_year = '$batch' AND r.semester_id = $i LIMIT 1");

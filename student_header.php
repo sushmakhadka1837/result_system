@@ -12,26 +12,27 @@ $published_results = [];
 
 if ($student_id) {
     /* ---------- 2. Unread Messages Count ---------- */
-    $stmt3 = $conn->prepare("SELECT COUNT(*) AS unread_count FROM messages WHERE receiver_id=? AND is_read=0");
+    $stmt3 = $conn->prepare("SELECT COUNT(*) AS unread_count FROM messages WHERE receiver_id=? AND sender_type='teacher' AND is_read=0");
     $stmt3->bind_param("i", $student_id);
     $stmt3->execute();
-    $unread_count = $stmt3->get_result()->fetch_assoc()['unread_count'];
+    $unread_count = (int)($stmt3->get_result()->fetch_assoc()['unread_count'] ?? 0);
 
     /* ---------- 3. Check Department & Published Results ---------- */
-    $stu_query = $conn->prepare("SELECT department_id FROM students WHERE id = ?");
+    $stu_query = $conn->prepare("SELECT department_id, batch_year FROM students WHERE id = ?");
     $stu_query->bind_param("i", $student_id);
     $stu_query->execute();
     $stu_res = $stu_query->get_result()->fetch_assoc();
 
     if ($stu_res) {
         $dept_id = $stu_res['department_id'];
+        $batch_year = $stu_res['batch_year'];
 
         $res_status = $conn->prepare("
             SELECT DISTINCT LOWER(TRIM(result_type)) as r_type 
             FROM results_publish_status 
-            WHERE department_id = ? AND published = 1
+            WHERE department_id = ? AND batch_year = ? AND published = 1
         ");
-        $res_status->bind_param("i", $dept_id);
+        $res_status->bind_param("is", $dept_id, $batch_year);
         $res_status->execute();
         $res_data = $res_status->get_result();
 
@@ -95,7 +96,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <a href="student_notes.php" class="nav-item <?= ($current_page == 'student_notes.php') ? 'active' : '' ?>">
                 <i class="fas fa-book-open"></i> <span>Notes</span>
             </a>
-            
+
             <a href="student_chat.php" class="nav-item <?= ($current_page == 'student_chat.php') ? 'active' : '' ?>" id="nav-messages" style="position: relative;">
                 <i class="fas fa-comment-dots"></i>
                 <?php if ($unread_count > 0): ?>

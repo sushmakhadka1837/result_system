@@ -5,11 +5,36 @@ $dept_id = intval($_GET['department_id']);
 $batch   = intval($_GET['batch']);
 $sem     = intval($_GET['semester']);
 
+// Convert student batch_year to syllabus flag (1=New, NULL/2=Old)
+$syllabus_flag = ($batch >= 2023) ? 1 : 'NULL';
+
 // 1. Fetch Students
 $stu_res = $conn->query("SELECT id, full_name, symbol_no FROM students WHERE department_id = $dept_id AND batch_year = $batch ORDER BY symbol_no ASC");
 
-// 2. Fetch Subjects (Excluding Project)
-$sub_res = $conn->query("SELECT id, subject_name, subject_code, is_elective FROM subjects_master WHERE semester_id = $sem AND department_id = $dept_id AND subject_type != 'Project' ORDER BY is_elective ASC, id ASC");
+// 2. Fetch Subjects (Excluding Project) - SYLLABUS FLAG CHECK
+if($syllabus_flag === 'NULL') {
+    $sub_res = $conn->query("
+        SELECT DISTINCT sm.id, sm.subject_name, sm.subject_code, sm.is_elective 
+        FROM subjects_master sm
+        LEFT JOIN subjects_department_semester sds ON sm.id = sds.subject_id
+        WHERE sm.semester_id = $sem 
+        AND sm.department_id = $dept_id 
+        AND sm.subject_type != 'Project'
+        AND (sds.syllabus_flag IS NULL OR sds.syllabus_flag = 2)
+        ORDER BY sm.is_elective ASC, sm.id ASC
+    ");
+} else {
+    $sub_res = $conn->query("
+        SELECT DISTINCT sm.id, sm.subject_name, sm.subject_code, sm.is_elective 
+        FROM subjects_master sm
+        LEFT JOIN subjects_department_semester sds ON sm.id = sds.subject_id
+        WHERE sm.semester_id = $sem 
+        AND sm.department_id = $dept_id 
+        AND sm.subject_type != 'Project'
+        AND sds.syllabus_flag = $syllabus_flag
+        ORDER BY sm.is_elective ASC, sm.id ASC
+    ");
+}
 
 $sub_list = [];
 while($s = $sub_res->fetch_assoc()){ $sub_list[] = $s; }

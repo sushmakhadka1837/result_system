@@ -7,6 +7,9 @@ $success_msg = "";
 if (isset($_POST['import_assessment'])) {
     $sem_id = intval($_POST['semester_confirm']);
     $batch_confirm = intval($_POST['batch_confirm']);
+    
+    // Convert student batch_year to syllabus flag (1=New, NULL/2=Old)
+    $syllabus_flag = ($batch_confirm >= 2023) ? 1 : 'NULL';
 
     if ($_FILES['csv_file']['size'] > 0) {
         $file = fopen($_FILES['csv_file']['tmp_name'], "r");
@@ -40,8 +43,28 @@ if (isset($_POST['import_assessment'])) {
                     $total_days = intval($row[$i+3]);      // Total Working Days
                     $att_days   = intval($row[$i+4]);      // Attended Days
 
-                    // Database bata Subject ID khojne
-                    $sub_q = $conn->query("SELECT id FROM subjects_master WHERE subject_code = '$subject_code' AND semester_id = $sem_id LIMIT 1");
+                    // Database bata Subject ID khojne - SYLLABUS FLAG CHECK
+                    if($syllabus_flag === 'NULL') {
+                        $sub_q = $conn->query("
+                            SELECT DISTINCT sm.id 
+                            FROM subjects_master sm
+                            LEFT JOIN subjects_department_semester sds ON sm.id = sds.subject_id
+                            WHERE sm.subject_code = '$subject_code' 
+                            AND sm.semester_id = $sem_id
+                            AND (sds.syllabus_flag IS NULL OR sds.syllabus_flag = 2)
+                            LIMIT 1
+                        ");
+                    } else {
+                        $sub_q = $conn->query("
+                            SELECT DISTINCT sm.id 
+                            FROM subjects_master sm
+                            LEFT JOIN subjects_department_semester sds ON sm.id = sds.subject_id
+                            WHERE sm.subject_code = '$subject_code' 
+                            AND sm.semester_id = $sem_id
+                            AND sds.syllabus_flag = $syllabus_flag
+                            LIMIT 1
+                        ");
+                    }
                     
                     if($sub_data = $sub_q->fetch_assoc()) {
                         $sid = $sub_data['id'];
@@ -120,7 +143,12 @@ if (isset($_POST['import_assessment'])) {
                 <h1 class="text-3xl font-black text-slate-800 uppercase italic">Assessment Manager</h1>
                 <p class="text-slate-500 text-sm">Theory (30) + Practical (20) Calculation</p>
             </div>
-            <a href="view_recent_assessment.php" class="bg-slate-800 text-white px-6 py-2 rounded-xl font-bold shadow-lg hover:bg-slate-700 transition">Recent Uploads</a>
+            <div class="flex gap-3">
+                <a href="batch_assignment_tool.php" class="bg-amber-600 text-white px-6 py-2 rounded-xl font-bold shadow-lg hover:bg-amber-700 transition">
+                    <i class="fas fa-cog"></i> Batch Settings
+                </a>
+                <a href="view_recent_assessment.php" class="bg-slate-800 text-white px-6 py-2 rounded-xl font-bold shadow-lg hover:bg-slate-700 transition">Recent Uploads</a>
+            </div>
         </div>
 
         <?php if($success_msg): ?>

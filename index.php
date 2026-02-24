@@ -1173,9 +1173,12 @@ require 'db_config.php';
     <div class="col-lg-4 col-md-6">
       <div class="custom-card">
         <h4 class="card-title"><i class="fas fa-comment-dots text-success"></i> Feedback</h4>
+        <p class="text-muted" style="font-size: 12px; margin-bottom: 15px;">
+          <i class="fas fa-info-circle"></i> We'll send a verification email to confirm your feedback.
+        </p>
         <form action="submit_feedback.php" method="POST" class="feedback-form">
           <input type="text" name="student_name" placeholder="Your Name" required>
-          <input type="email" name="student_email" placeholder="Your Email" required class="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
+          <input type="email" name="student_email" placeholder="Your Valid Email" required class="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
           <textarea name="feedback" rows="3" placeholder="How can we improve?" required></textarea>
           <button type="submit" class="btn-submit">Send 🚀</button>
         </form>
@@ -1204,7 +1207,7 @@ require 'db_config.php';
     // Fetch testimonials from database (all status)
     $testimonials_q = $conn->query("SELECT * FROM testimonials ORDER BY created_at DESC LIMIT 6");
     if($testimonials_q && $testimonials_q->num_rows > 0):
-      while($t = $testimonials_q->fetch_assoc()):
+      while($t = $testimonials_q->fetch_assoc()): 
         $stars = str_repeat('★', $t['rating']) . str_repeat('☆', 5 - $t['rating']);
     ?>
     <div class="col-lg-4 col-md-6 testimonial-item" data-category="<?= $t['role'] ?>">

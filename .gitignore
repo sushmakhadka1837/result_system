@@ -4,7 +4,21 @@
 # Composer lock file
 composer.lock
 
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Local config with credentials
+mail_config.php
+db_config.production.php
+
 # OS / Editor specific files
 .DS_Store
 Thumbs.db
 *.log
+
+# Runtime uploads and caches
+/uploads/
+/storage/
+/tmp/

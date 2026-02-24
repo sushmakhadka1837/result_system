@@ -38,9 +38,9 @@ $sem_id = intval($_GET['sem_id'] ?? $student['student_actual_sem']);
 // 3. Result Publication Status Check
 $publish_check = $conn->prepare("
     SELECT published FROM results_publish_status
-    WHERE department_id=? AND semester_id=? AND result_type='assessment' AND published=1
+    WHERE department_id=? AND batch_year=? AND semester_id=? AND result_type='assessment' AND published=1
 ");
-$publish_check->bind_param("ii", $student['department_id'], $sem_id);
+$publish_check->bind_param("isi", $student['department_id'], $student['batch_year'], $sem_id);
 $publish_check->execute();
 $is_published = $publish_check->get_result()->num_rows;
 

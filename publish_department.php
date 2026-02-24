@@ -3,6 +3,7 @@ session_start();
 require 'db_config.php';
 
 $dept_id = intval($_GET['dept_id'] ?? 0);
+$batch_year = isset($_GET['batch']) ? intval($_GET['batch']) : 0;
 $dept = $conn->query("SELECT * FROM departments WHERE id=$dept_id")->fetch_assoc();
 $semesters = $conn->query("SELECT * FROM semesters WHERE department_id=$dept_id ORDER BY semester_order ASC");
 ?>
@@ -34,20 +35,19 @@ $semesters = $conn->query("SELECT * FROM semesters WHERE department_id=$dept_id 
 
 <?php
 // UT publish status
-$ut = $conn->query("
-    SELECT published FROM results_publish_status 
-    WHERE department_id=$dept_id 
-    AND semester_id={$sem['id']} 
-    AND result_type='ut'
-")->fetch_assoc();
+$batch_clause = $batch_year ? " AND batch_year=$batch_year" : "";
+$ut = $conn->query("\
+    SELECT published FROM results_publish_status \
+    WHERE department_id=$dept_id \
+    AND semester_id={$sem['id']} \
+    AND result_type='ut'".$batch_clause)->fetch_assoc();
 
 // Assessment publish status
-$ass = $conn->query("
-    SELECT published FROM results_publish_status 
-    WHERE department_id=$dept_id 
-    AND semester_id={$sem['id']} 
-    AND result_type='assessment'
-")->fetch_assoc();
+$ass = $conn->query("\
+    SELECT published FROM results_publish_status \
+    WHERE department_id=$dept_id \
+    AND semester_id={$sem['id']} \
+    AND result_type='assessment'".$batch_clause)->fetch_assoc();
 
 $ut_published = $ut['published'] ?? 0;
 $ass_published = $ass['published'] ?? 0;

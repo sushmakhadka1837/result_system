@@ -106,6 +106,121 @@ function notifyTeacherPendingUploads($teacher_id, $pending_count, $subject_name,
 }
 
 /**
+ * Notify teacher of a new student absence request
+ */
+function notifyTeacherAbsenceRequest($teacher_id, $student_name, $subject_name, $subject_code, $exam_component, $absence_date, $conn){
+    try {
+        $teacher = $conn->query("SELECT email, full_name FROM teachers WHERE id=$teacher_id")->fetch_assoc();
+
+        if(!$teacher) return false;
+
+        $subject = "New Student Absence Request";
+        $subject_label = trim($subject_name . ($subject_code ? " ($subject_code)" : ''));
+        $message = "
+        <h2>Absence Request Submitted</h2>
+        <p>Hi {$teacher['full_name']},</p>
+        <p><strong>Student:</strong> {$student_name}</p>
+        <p><strong>Subject:</strong> {$subject_label}</p>
+        <p><strong>Exam:</strong> {$exam_component}</p>
+        <p><strong>Absence Date:</strong> {$absence_date}</p>
+        <p>Please <a href='[LOGIN_LINK]/teacher_absence_requests.php'>review the request</a> and take action.</p>
+        ";
+
+        return sendEmail($teacher['email'], $subject, $message);
+    } catch(Exception $e) {
+        error_log("Notification error: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Notify teacher of a new assessment re-total / recheck request
+ */
+function notifyTeacherRecheckRequest($teacher_id, $student_name, $symbol_no, $subject_name, $subject_code, $request_type, $reason_text, $conn){
+    try {
+        $teacher_id = (int)$teacher_id;
+        if ($teacher_id <= 0) return false;
+
+        $teacher_stmt = $conn->prepare("SELECT email, full_name FROM teachers WHERE id = ? LIMIT 1");
+        $teacher_stmt->bind_param('i', $teacher_id);
+        $teacher_stmt->execute();
+        $teacher = $teacher_stmt->get_result()->fetch_assoc();
+
+        if(!$teacher || empty($teacher['email'])) return false;
+
+        $safe_type = strtolower(trim((string)$request_type)) === 'retotal' ? 'Re-total' : 'Recheck';
+        $subject_label = trim($subject_name . ($subject_code ? " ($subject_code)" : ''));
+
+        $subject = "New {$safe_type} Request Submitted";
+        $message = "
+        <h2>New Assessment {$safe_type} Request</h2>
+        <p>Hi {$teacher['full_name']},</p>
+        <p>A student has submitted a new <strong>{$safe_type}</strong> request for your subject.</p>
+        <p><strong>Student:</strong> {$student_name}</p>
+        <p><strong>Symbol No:</strong> {$symbol_no}</p>
+        <p><strong>Subject:</strong> {$subject_label}</p>
+        <p><strong>Request Type:</strong> {$safe_type}</p>
+        <p><strong>Reason:</strong><br>" . nl2br(htmlspecialchars($reason_text, ENT_QUOTES, 'UTF-8')) . "</p>
+        <p>Please <a href='[LOGIN_LINK]/teacher_assessment_recheck_requests.php'>open the Recheck panel</a> and review this request.</p>
+        ";
+
+        return sendEmail($teacher['email'], $subject, $message);
+    } catch(Exception $e) {
+        error_log("Notification error: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Notify student when recheck/re-total request is reviewed/finalized
+ */
+function notifyStudentRecheckStatusUpdate($student_id, $student_name, $subject_name, $subject_code, $request_type, $new_status, $remark_text, $updated_by, $conn){
+    try {
+        $student_id = (int)$student_id;
+        if ($student_id <= 0) return false;
+
+        $student_stmt = $conn->prepare("SELECT email, full_name FROM students WHERE id = ? LIMIT 1");
+        $student_stmt->bind_param('i', $student_id);
+        $student_stmt->execute();
+        $student = $student_stmt->get_result()->fetch_assoc();
+        if (!$student || empty($student['email'])) return false;
+
+        $safe_type = strtolower(trim((string)$request_type)) === 'retotal' ? 'Re-total' : 'Recheck';
+        $status = strtolower(trim((string)$new_status));
+        $by = strtolower(trim((string)$updated_by)) === 'admin' ? 'Admin' : 'Teacher';
+
+        $status_label = 'Updated';
+        if ($status === 'teacher_recommended') $status_label = 'Recommended by Teacher';
+        elseif ($status === 'teacher_rejected') $status_label = 'Rejected by Teacher';
+        elseif ($status === 'approved') $status_label = 'Approved';
+        elseif ($status === 'rejected') $status_label = 'Rejected';
+
+        $subject_label = trim($subject_name . ($subject_code ? " ($subject_code)" : ''));
+        $display_name = trim((string)$student_name) !== '' ? (string)$student_name : (string)($student['full_name'] ?? 'Student');
+        $remark_html = trim((string)$remark_text) !== ''
+            ? '<p><strong>Remark:</strong><br>' . nl2br(htmlspecialchars((string)$remark_text, ENT_QUOTES, 'UTF-8')) . '</p>'
+            : '';
+
+        $subject = "Your {$safe_type} Request Status Updated";
+        $message = "
+        <h2>{$safe_type} Request Update</h2>
+        <p>Hi {$display_name},</p>
+        <p>Your {$safe_type} request status has been updated.</p>
+        <p><strong>Subject:</strong> {$subject_label}</p>
+        <p><strong>Current Status:</strong> {$status_label}</p>
+        <p><strong>Updated By:</strong> {$by}</p>
+        {$remark_html}
+        <p>Please <a href='[LOGIN_LINK]/student_recheck_requests.php'>check your request panel</a> for details.</p>
+        ";
+
+        return sendEmail($student['email'], $subject, $message);
+    } catch(Exception $e) {
+        error_log("Notification error: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
  * Notify student of appeal decision
  */
 function notifyStudentAppealResolved($student_id, $penalty_type, $decision, $conn){

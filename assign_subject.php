@@ -117,15 +117,21 @@ if(isset($_POST['show'])){
     // Filter subjects by batch/syllabus: batch > 2022 = syllabus_flag 1, else 0 or NULL
     $syllabus_condition = ($batch > 2022) ? "sds.syllabus_flag = 1" : "(sds.syllabus_flag = 0 OR sds.syllabus_flag IS NULL)";
 
+    // Old syllabus subjects were historically stored without a specific batch_year; fall back to NULL or <=2022 mappings
+    // New syllabus subjects might be mapped once (e.g., 2023) or stored as sentinel 1; allow reuse for later new batches
+    $batch_filter = ($batch > 2022)
+      ? "(sds.batch_year = $batch OR sds.batch_year IS NULL OR sds.batch_year >= 2023 OR sds.batch_year = 1)"  // New syllabus: accept baseline/sentinel rows
+      : "(sds.batch_year = $batch OR sds.batch_year IS NULL OR sds.batch_year <= 2022)"; // Old syllabus: allow legacy rows
+
     // Fetch subjects for department+semester+batch
     $subs = $conn->query("
-        SELECT sds.subject_id, sm.subject_name, sm.subject_code, sm.credit_hours, sm.is_elective
-        FROM subjects_department_semester sds
-        JOIN subjects_master sm ON sm.id = sds.subject_id
-        WHERE sds.department_id=$dept 
-          AND sds.semester=$sem
-          AND sds.batch_year=$batch
-          AND $syllabus_condition
+      SELECT sds.subject_id, sm.subject_name, sm.subject_code, sm.credit_hours, sm.is_elective
+      FROM subjects_department_semester sds
+      JOIN subjects_master sm ON sm.id = sds.subject_id
+      WHERE sds.department_id=$dept 
+        AND sds.semester=$sem
+        AND $batch_filter
+        AND $syllabus_condition
     ");
 
     if($subs && $subs->num_rows>0){
